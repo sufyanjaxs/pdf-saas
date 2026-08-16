@@ -1,0 +1,28 @@
+{
+  "name": "pdf-saas",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A ridiculously fast PDF & image toolbox that runs entirely in the browser. No upload, no login, no server.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "copy:pdfjs": "node scripts/copy-pdfjs-worker.mjs"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.0",
+    "typescript": "^5.5.4",
+    "vitest": "^2.1.1"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "packageManager": "npm@11.17.0"
+}

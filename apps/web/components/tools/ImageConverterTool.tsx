@@ -1,0 +1,115 @@
+'use client'
+
+import { useCallback, useState } from 'react'
+import { FileUploader } from './FileUploader'
+import { FileList } from './FileList'
+import { ProgressBar } from './ProgressBar'
+import { ResultPanel, type ResultItem } from './ResultPanel'
+import { ErrorAlert } from './ErrorAlert'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { useImageWorker } from '@/hooks/useImageWorker'
+import { fileToImagePayload, resultBlobUrl } from '@/lib/client-utils'
+
+type Format = 'image/jpeg' | 'image/png' | 'image/webp'
+
+const FORMATS: { id: Format; name: string }[] = [
+  { id: 'image/jpeg', name: 'JPG' },
+  { id: 'image/png', name: 'PNG' },
+  { id: 'image/webp', name: 'WEBP' },
+]
+
+const ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,image/bmp'
+
+export function ImageConverterTool() {
+  const [files, setFiles] = useState<File[]>([])
+  const [format, setFormat] = useState<Format>('image/png')
+  const [quality, setQuality] = useState(90)
+  const [result, setResult] = useState<ResultItem[] | null>(null)
+  const worker = useImageWorker()
+
+  const run = useCallback(async () => {
+    if (files.length === 0) return
+    setResult(null)
+    const payloads = await Promise.all(files.map((f) => fileToImagePayload(f)))
+    const res = await worker.run('convert', {
+      files: payloads,
+      opts: { format, quality: quality / 100 },
+    })
+
+    const items: ResultItem[] = res.map((r) => ({
+      name: r.name,
+      url: resultBlobUrl(r.mime, r.bytes),
+      size: r.size,
+      detail: `${r.width}×${r.height}`,
+    }))
+    setResult(items)
+  }, [files, format, quality, worker])
+
+  const reset = useCallback(() => {
+    setFiles([])
+    setResult(null)
+  }, [])
+
+  const fmtName = FORMATS.find((f) => f.id === format)?.name ?? ''
+
+  return (
+    <Card>
+      {files.length === 0 ? (
+        <FileUploader accept={ACCEPT} multiple maxSizeMB={50} minFiles={1} onFiles={(incoming) => setFiles(incoming)} />
+      ) : (
+        <div className="space-y-6">
+          <FileList files={files} onRemove={(i) => setFiles((p) => p.filter((_, j) => j !== i))} />
+
+          <div className="grid gap-6 sm:grid-cols-2">
+            <div>
+              <h3 className="mb-2 text-sm font-semibold text-slate-700">Convert to</h3>
+              <div className="flex gap-2">
+                {FORMATS.map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setFormat(f.id)}
+                    className={`rounded-lg border-2 px-4 py-2 text-sm font-medium transition-colors ${
+                      format === f.id ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-600 hover:border-brand-300'
+                    }`}
+                  >
+                    {f.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {format !== 'image/png' && (
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-slate-700">Quality</h3>
+                  <span className="text-sm tabular-nums text-slate-500">{quality}%</span>
+                </div>
+                <input
+                  type="range"
+                  min={10}
+                  max={100}
+                  value={quality}
+                  onChange={(e) => setQuality(Number(e.target.value))}
+                  className="w-full accent-brand-600"
+                />
+              </div>
+            )}
+          </div>
+
+          {worker.error && <ErrorAlert message={worker.error} />}
+
+          <div className="flex items-center gap-3">
+            <Button size="lg" loading={worker.running} disabled={files.length === 0} onClick={() => void run()}>
+              Convert {files.length} image{files.length === 1 ? '' : 's'} to {fmtName}
+            </Button>
+            {worker.running && <Button variant="ghost" onClick={worker.cancel}>Cancel</Button>}
+          </div>
+          <ProgressBar value={worker.progress} label={worker.label} />
+
+          {result && <ResultPanel items={result} onReset={reset} />}
+        </div>
+      )}
+    </Card>
+  )
+}
