@@ -11,7 +11,7 @@ let configured = false
 
 function ensurePdfJs() {
   if (configured) return
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js'
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/pdf.worker.min.js`
   configured = true
 }
 

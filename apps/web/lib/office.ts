@@ -22,7 +22,7 @@ export type OfficeProgress = (pct: number, label?: string) => void
 const noop = () => {}
 
 function ensurePdfWorker() {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js'
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/pdf.worker.min.js`
 }
 
 async function loadPdf(bytes: ArrayBuffer | Uint8Array) {
