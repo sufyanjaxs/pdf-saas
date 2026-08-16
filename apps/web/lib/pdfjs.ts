@@ -11,7 +11,10 @@ let configured = false
 
 function ensurePdfJs() {
   if (configured) return
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/pdf.worker.min.js`
+  // Public asset: apps/web/public/pdf.worker.min.js, served under the GitHub
+  // Pages base path (/pdf-saas). Hard-coded so the exported bundle references a
+  // stable URL with no env inlining dependency.
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf-saas/pdf.worker.min.js'
   configured = true
 }
 

@@ -6,11 +6,6 @@ const nextConfig = {
   // (remove/empty when deploying to a custom domain or the user site root)
   basePath: '/pdf-saas',
   assetPrefix: '/pdf-saas/',
-  // Expose the base path to client code (e.g. pdfjs worker URLs) so manual
-  // asset references pick up the sub-path on GitHub Pages.
-  env: {
-    NEXT_PUBLIC_BASE_PATH: '/pdf-saas',
-  },
   transpilePackages: [
     '@pdf-saas/shared',
     '@pdf-saas/file-utils',
