@@ -1,10 +1,10 @@
 # PDF & Image Toolbox
 
-A free, browser-only PDF and image toolbox. Everything runs locally in your browser — no uploads, no servers, no login, no waiting.
+A free, browser-only PDF, image, and document toolbox. Everything runs locally in your browser — no uploads, no servers, no login, no waiting.
 
 ## Features
 
-12 tools, split into two categories:
+23 tools, split into three categories:
 
 **PDF Tools**
 - Split PDF
@@ -15,16 +15,30 @@ A free, browser-only PDF and image toolbox. Everything runs locally in your brow
 - JPG → PDF
 - PDF → JPG
 - Compress PDF
+- Protect PDF (encrypt with a password)
+- Unlock PDF (remove password protection)
+- Watermark PDF
+- Add Page Numbers
+- Crop PDF
+- Organize Pages (reorder, reverse, or keep a custom range)
 
 **Image Tools**
 - Compress Image
 - Resize Image
 - Crop Image
 - Convert Image
+- Add Text to Image
+
+**Office Conversion**
+- PDF → Word
+- PDF → Excel
+- PDF → PowerPoint
+- Word → PDF
 
 ## Why it's fast
 
 - **100% local processing** — your files never leave the device. PDF operations run in a Web Worker with [pdf-lib](https://github.com/Hopding/PDF-LIB), rendering and PDF→JPG use [PDF.js](https://mozilla.github.io/pdf.js/), and image operations use the browser-native Canvas API.
+- **Office conversions** — PDF→Word, PDF→Excel, and PDF→PowerPoint use [pdf.js](https://mozilla.github.io/pdf.js/), [docx](https://github.com/dolanmiu/docx), [exceljs](https://github.com/exceljs/exceljs), and [PptxGenJS](https://github.com/gitbrent/PptxGenJS) to build downloadable `.docx` / `.xlsx` / `.pptx` files. Word→PDF extracts the text and renders it to a PDF.
 - **No account, no sign-up** — open a tool and use it.
 - **Lazy-loaded tools** — each tool page loads its code on demand, keeping first paint tiny.
 - **Mobile friendly** — responsive UI, touch-friendly drag-and-drop.
@@ -34,7 +48,11 @@ A free, browser-only PDF and image toolbox. Everything runs locally in your brow
 - [Next.js](https://nextjs.org/) 14 (App Router, SSG) + React 18 + [Tailwind CSS](https://tailwindcss.com/)
 - [Turborepo](https://turbo.build/) workspaces — `apps/web` + shared `packages/*`
 - [pdf-lib](https://github.com/Hopding/PDF-LIB) (MIT) — PDF manipulation
-- [pdf.js](https://mozilla.github.io/pdf.js/) (Apache-2.0) — PDF rendering / thumbnails / PDF→JPG
+- [pdf.js](https://mozilla.github.io/pdf.js/) (Apache-2.0) — PDF rendering / thumbnails / PDF→JPG / office extraction
+- [docx](https://github.com/dolanmiu/docx) (MIT) — PDF→Word
+- [exceljs](https://github.com/exceljs/exceljs) (MIT) — PDF→Excel
+- [PptxGenJS](https://github.com/gitbrent/PptxGenJS) (MIT) — PDF→PowerPoint
+- [mammoth](https://github.com/mwilliamson/mammoth.js) (BSD-2) — Word→PDF text extraction
 - [Vitest](https://vitest.dev/) — unit tests for the engine packages
 
 ## Repository structure
@@ -44,7 +62,7 @@ packages/shared        Tool metadata + Web Worker protocol types
 packages/file-utils    Validation, page ranges, formatting, download helpers
 packages/pdf-engine    All PDF operations (split, merge, rotate, compress, ...)
 packages/image-engine  Image operations (resize, crop, convert, compress)
-apps/web               Next.js app — 12 tools + landing page
+apps/web               Next.js app — 23 tools + landing page
 scripts                pdf.js worker copy script
 ```
 

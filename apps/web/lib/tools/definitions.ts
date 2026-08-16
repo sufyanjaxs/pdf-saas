@@ -1,7 +1,8 @@
 import type { ToolMeta, ToolCategory } from '@pdf-saas/shared'
+import type { ToolIconName } from './icon-map'
 
 export interface ToolDefinition extends ToolMeta {
-  icon: 'file-split' | 'file-merge' | 'trash' | 'scissors' | 'rotate' | 'image-to-pdf' | 'pdf-to-image' | 'archive' | 'image-compress' | 'ruler' | 'crop' | 'refresh'
+  icon: ToolIconName
 }
 
 const def = (
@@ -88,6 +89,60 @@ export const toolDefinitions: ToolDefinition[] = [
     ['compress pdf', 'reduce pdf size', 'smaller pdf', 'pdf compressor'],
   ),
   def(
+    'pdf-protector',
+    'Protect PDF',
+    'Protect',
+    'PDF',
+    'Lock a PDF with a password so only people you choose can open it.',
+    'lock',
+    ['protect pdf', 'password protect pdf', 'lock pdf', 'encrypt pdf'],
+  ),
+  def(
+    'pdf-unlocker',
+    'Unlock PDF',
+    'Unlock',
+    'PDF',
+    'Remove a password from a PDF and download an open copy.',
+    'unlock',
+    ['unlock pdf', 'remove pdf password', 'decrypt pdf', 'unprotect pdf'],
+  ),
+  def(
+    'pdf-watermark',
+    'Add Watermark',
+    'Watermark',
+    'PDF',
+    'Stamp text across every page — perfect for marking drafts or confidential files.',
+    'stamp',
+    ['pdf watermark', 'add watermark to pdf', 'stamp pdf', 'confidential pdf'],
+  ),
+  def(
+    'pdf-page-numbers',
+    'Page Numbers',
+    'Number',
+    'PDF',
+    'Add page numbers to a PDF in the position and format you prefer.',
+    'list-ordered',
+    ['pdf page numbers', 'number pages pdf', 'add page numbers to pdf'],
+  ),
+  def(
+    'pdf-cropper',
+    'Crop PDF',
+    'Crop',
+    'PDF',
+    'Trim the edges of every page by percentage to remove unwanted margins.',
+    'frame',
+    ['crop pdf', 'trim pdf margins', 'remove pdf borders', 'pdf crop pages'],
+  ),
+  def(
+    'pdf-organizer',
+    'Organize Pages',
+    'Organize',
+    'PDF',
+    'Reorder pages however you like with a simple list like 3, 1, 4, 2.',
+    'shuffle',
+    ['reorder pdf pages', 'organize pdf', 'change pdf page order', 'sort pdf pages'],
+  ),
+  def(
     'image-compressor',
     'Image Compressor',
     'Compress',
@@ -123,10 +178,56 @@ export const toolDefinitions: ToolDefinition[] = [
     'refresh',
     ['convert image', 'jpg to png', 'png to jpg', 'webp converter'],
   ),
+  def(
+    'image-text',
+    'Add Text to Image',
+    'Add Text',
+    'Image',
+    'Overlay a caption on your image with custom text, color, size and position.',
+    'type',
+    ['add text to image', 'caption image', 'text overlay', 'watermark image text'],
+  ),
+  def(
+    'pdf-to-word',
+    'PDF to Word',
+    'PDF→Word',
+    'Office',
+    'Convert PDF text into an editable Word document you can open in Word or Google Docs.',
+    'file-text',
+    ['pdf to word', 'convert pdf to docx', 'pdf to editable document'],
+  ),
+  def(
+    'pdf-to-excel',
+    'PDF to Excel',
+    'PDF→Excel',
+    'Office',
+    'Turn PDF text into an Excel spreadsheet, one row per line.',
+    'file-spreadsheet',
+    ['pdf to excel', 'convert pdf to xlsx', 'pdf to spreadsheet'],
+  ),
+  def(
+    'pdf-to-powerpoint',
+    'PDF to PowerPoint',
+    'PDF→PPT',
+    'Office',
+    'Turn each PDF page into a PowerPoint slide, ready to present.',
+    'presentation',
+    ['pdf to powerpoint', 'pdf to pptx', 'convert pdf to ppt'],
+  ),
+  def(
+    'word-to-pdf',
+    'Word to PDF',
+    'Word→PDF',
+    'Office',
+    'Convert Word documents into a clean PDF.',
+    'file-output',
+    ['word to pdf', 'docx to pdf', 'convert word document to pdf'],
+  ),
 ]
 
 export const pdfTools = toolDefinitions.filter((t) => t.category === 'PDF')
 export const imageTools = toolDefinitions.filter((t) => t.category === 'Image')
+export const officeTools = toolDefinitions.filter((t) => t.category === 'Office')
 
 export function getTool(slug: string): ToolDefinition | undefined {
   return toolDefinitions.find((t) => t.slug === slug)

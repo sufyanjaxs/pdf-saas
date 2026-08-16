@@ -41,6 +41,17 @@ const loaders: Record<string, () => Promise<{ default: ComponentType }>> = {
   'image-resizer': () => import('@/components/tools/ImageResizerTool').then((m) => ({ default: m.ImageResizerTool })),
   'image-cropper': () => import('@/components/tools/ImageCropperTool').then((m) => ({ default: m.ImageCropperTool })),
   'image-converter': () => import('@/components/tools/ImageConverterTool').then((m) => ({ default: m.ImageConverterTool })),
+  'image-text': () => import('@/components/tools/ImageTextTool').then((m) => ({ default: m.ImageTextTool })),
+  'pdf-protector': () => import('@/components/tools/PdfProtectTool').then((m) => ({ default: m.PdfProtectTool })),
+  'pdf-unlocker': () => import('@/components/tools/PdfUnlockTool').then((m) => ({ default: m.PdfUnlockTool })),
+  'pdf-watermark': () => import('@/components/tools/PdfWatermarkTool').then((m) => ({ default: m.PdfWatermarkTool })),
+  'pdf-page-numbers': () => import('@/components/tools/PdfPageNumbersTool').then((m) => ({ default: m.PdfPageNumbersTool })),
+  'pdf-cropper': () => import('@/components/tools/PdfCropTool').then((m) => ({ default: m.PdfCropTool })),
+  'pdf-organizer': () => import('@/components/tools/PdfOrganizerTool').then((m) => ({ default: m.PdfOrganizerTool })),
+  'pdf-to-word': () => import('@/components/tools/PdfToWordTool').then((m) => ({ default: m.PdfToWordTool })),
+  'pdf-to-excel': () => import('@/components/tools/PdfToExcelTool').then((m) => ({ default: m.PdfToExcelTool })),
+  'pdf-to-powerpoint': () => import('@/components/tools/PdfToPowerPointTool').then((m) => ({ default: m.PdfToPowerPointTool })),
+  'word-to-pdf': () => import('@/components/tools/WordToPdfTool').then((m) => ({ default: m.WordToPdfTool })),
 }
 
 export const toolRegistry: RegistryEntry[] = toolDefinitions.map((def) => {

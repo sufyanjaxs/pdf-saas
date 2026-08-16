@@ -100,6 +100,46 @@ export interface PdfToJpgPayload {
   quality: number;
 }
 
+export interface ProtectPayload {
+  bytes: Uint8Array;
+  /** password required to open the PDF */
+  password: string;
+}
+
+export interface UnlockPayload {
+  bytes: Uint8Array;
+  /** optional password if the PDF is password-protected */
+  password?: string;
+}
+
+export interface WatermarkPayload {
+  bytes: Uint8Array;
+  text: string;
+  /** opacity 0..1 */
+  opacity: number;
+  /** font size in points */
+  size: number;
+}
+
+export interface PageNumbersPayload {
+  bytes: Uint8Array;
+  position: 'bottom-right' | 'bottom-center' | 'top-right' | 'top-center';
+  /** "Page {n} of {total}" */
+  format: string;
+}
+
+export interface PdfCropPayload {
+  bytes: Uint8Array;
+  /** percentages of each page edge to trim */
+  margins: { top: number; right: number; bottom: number; left: number };
+}
+
+export interface ReorderPayload {
+  bytes: Uint8Array;
+  /** 1-based page numbers in the desired order */
+  order: number[];
+}
+
 /* ------------------------------------------------------------------ */
 /* Image operations                                                    */
 /* ------------------------------------------------------------------ */
@@ -146,7 +186,7 @@ export interface ImageResult {
 /* Tool registry metadata                                              */
 /* ------------------------------------------------------------------ */
 
-export type ToolCategory = 'PDF' | 'Image';
+export type ToolCategory = 'PDF' | 'Image' | 'Office';
 
 export interface ToolMeta {
   slug: string;

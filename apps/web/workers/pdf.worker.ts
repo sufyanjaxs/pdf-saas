@@ -11,6 +11,12 @@ import {
   rotatePdf,
   imagesToPdf,
   compressPdf,
+  reorderPdf,
+  protectPdf,
+  unlockPdf,
+  watermarkPdf,
+  addPageNumbers,
+  cropPdf,
 } from '@pdf-saas/pdf-engine'
 import type {
   WorkerRequest,
@@ -22,6 +28,12 @@ import type {
   MergePayload,
   ImagesToPdfPayload,
   CompressPayload,
+  ReorderPayload,
+  ProtectPayload,
+  UnlockPayload,
+  WatermarkPayload,
+  PageNumbersPayload,
+  PdfCropPayload,
 } from '@pdf-saas/shared'
 
 const CHUNK = 0.8
@@ -106,6 +118,54 @@ async function handle(ev: MessageEvent<WorkerRequest>) {
           originalSize: out.originalSize,
           compressedSize: out.compressedSize,
         })
+        break
+      }
+      case 'reorder': {
+        sendProgress(id, 20, 'Reading PDF…')
+        const p = payload as ReorderPayload
+        const bytes = await reorderPdf(p)
+        sendProgress(id, CHUNK * 100, 'Reordering pages…')
+        sendResult(id, { kind: 'pdf', bytes, mime: 'application/pdf' })
+        break
+      }
+      case 'protect': {
+        sendProgress(id, 20, 'Reading PDF…')
+        const p = payload as ProtectPayload
+        const bytes = await protectPdf(p)
+        sendProgress(id, CHUNK * 100, 'Encrypting…')
+        sendResult(id, { kind: 'pdf', bytes, mime: 'application/pdf' })
+        break
+      }
+      case 'unlock': {
+        sendProgress(id, 20, 'Reading PDF…')
+        const p = payload as UnlockPayload
+        const bytes = await unlockPdf(p)
+        sendProgress(id, CHUNK * 100, 'Removing encryption…')
+        sendResult(id, { kind: 'pdf', bytes, mime: 'application/pdf' })
+        break
+      }
+      case 'watermark': {
+        sendProgress(id, 20, 'Reading PDF…')
+        const p = payload as WatermarkPayload
+        const bytes = await watermarkPdf(p)
+        sendProgress(id, CHUNK * 100, 'Adding watermark…')
+        sendResult(id, { kind: 'pdf', bytes, mime: 'application/pdf' })
+        break
+      }
+      case 'page-numbers': {
+        sendProgress(id, 20, 'Reading PDF…')
+        const p = payload as PageNumbersPayload
+        const bytes = await addPageNumbers(p)
+        sendProgress(id, CHUNK * 100, 'Adding page numbers…')
+        sendResult(id, { kind: 'pdf', bytes, mime: 'application/pdf' })
+        break
+      }
+      case 'crop': {
+        sendProgress(id, 20, 'Reading PDF…')
+        const p = payload as PdfCropPayload
+        const bytes = await cropPdf(p)
+        sendProgress(id, CHUNK * 100, 'Cropping…')
+        sendResult(id, { kind: 'pdf', bytes, mime: 'application/pdf' })
         break
       }
       default:

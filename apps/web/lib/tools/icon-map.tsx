@@ -11,6 +11,17 @@ import {
   Ruler,
   Crop,
   Repeat,
+  FileText,
+  FileSpreadsheet,
+  Presentation,
+  FileOutput,
+  Lock,
+  Unlock,
+  Stamp,
+  ListOrdered,
+  Frame,
+  Shuffle,
+  Type,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -27,6 +38,17 @@ export type ToolIconName =
   | 'ruler'
   | 'crop'
   | 'refresh'
+  | 'file-text'
+  | 'file-spreadsheet'
+  | 'presentation'
+  | 'file-output'
+  | 'lock'
+  | 'unlock'
+  | 'stamp'
+  | 'list-ordered'
+  | 'frame'
+  | 'shuffle'
+  | 'type'
 
 const icons: Record<ToolIconName, LucideIcon> = {
   'file-split': FileStack,
@@ -41,6 +63,17 @@ const icons: Record<ToolIconName, LucideIcon> = {
   ruler: Ruler,
   crop: Crop,
   refresh: Repeat,
+  'file-text': FileText,
+  'file-spreadsheet': FileSpreadsheet,
+  presentation: Presentation,
+  'file-output': FileOutput,
+  lock: Lock,
+  unlock: Unlock,
+  stamp: Stamp,
+  'list-ordered': ListOrdered,
+  frame: Frame,
+  shuffle: Shuffle,
+  type: Type,
 }
 
 export function ToolIcon({ name, className }: { name: ToolIconName; className?: string }) {

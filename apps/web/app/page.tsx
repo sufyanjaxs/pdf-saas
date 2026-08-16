@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { ShieldCheck, Zap, Lock } from 'lucide-react'
-import { pdfTools, imageTools } from '@/lib/tools/definitions'
+import { pdfTools, imageTools, officeTools, type ToolDefinition } from '@/lib/tools/definitions'
 import { ToolIcon } from '@/lib/tools/icon-map'
 
 export default function Home() {
@@ -14,7 +14,7 @@ export default function Home() {
             No sign-up · No upload · 100% private
           </p>
           <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
-            PDF & Image Tools
+            PDF, Image & Office Tools
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-lg text-slate-600">
             Fast. Free. No login. Every tool runs entirely in your browser — your files
@@ -39,6 +39,8 @@ export default function Home() {
         <ToolSection title="PDF Tools" tools={pdfTools} />
         <div className="h-10" />
         <ToolSection title="Image Tools" tools={imageTools} />
+        <div className="h-10" />
+        <ToolSection title="Office Conversion" tools={officeTools} />
       </section>
 
       {/* Footer */}
@@ -52,13 +54,7 @@ export default function Home() {
   )
 }
 
-function ToolSection({
-  title,
-  tools,
-}: {
-  title: string
-  tools: { slug: string; name: string; shortName: string; description: string; icon: 'file-split' | 'file-merge' | 'trash' | 'scissors' | 'rotate' | 'image-to-pdf' | 'pdf-to-image' | 'archive' | 'image-compress' | 'ruler' | 'crop' | 'refresh' }[]
-}) {
+function ToolSection({ title, tools }: { title: string; tools: ToolDefinition[] }) {
   return (
     <div>
       <h2 className="mb-5 text-center text-sm font-semibold uppercase tracking-widest text-slate-400">

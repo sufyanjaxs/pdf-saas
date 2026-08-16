@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { PDFDocument } from 'pdf-lib'
+import { PDFDocument } from '@cantoo/pdf-lib'
 import {
   splitPdf,
   deletePages,
@@ -8,7 +8,14 @@ import {
   mergePdfs,
   imagesToPdf,
   compressPdf,
+  reorderPdf,
+  protectPdf,
+  unlockPdf,
+  watermarkPdf,
+  addPageNumbers,
+  cropPdf,
   parseRanges,
+  textToPdf,
 } from '../src/index'
 
 async function makeTestPdf(pages: number): Promise<Uint8Array> {
@@ -108,5 +115,86 @@ describe('compressPdf', () => {
 describe('parseRanges', () => {
   it('parses like the UI expects', () => {
     expect(parseRanges('2, 5, 7–10')).toEqual([2, 5, 7, 8, 9, 10])
+  })
+})
+
+describe('textToPdf', () => {
+  it('produces a PDF with the given text on pages', async () => {
+    const out = await textToPdf({ text: 'Hello world\nSecond line' })
+    const doc = await PDFDocument.load(out)
+    expect(doc.getPageCount()).toBe(1)
+    expect(doc.getPage(0).getSize().width).toBeCloseTo(595.28, 1)
+  })
+
+  it('paginates long text across multiple pages', async () => {
+    const long = Array.from({ length: 200 }, (_, i) => `Line number ${i + 1}`).join('\n')
+    const out = await textToPdf({ text: long })
+    const doc = await PDFDocument.load(out)
+    expect(doc.getPageCount()).toBeGreaterThan(1)
+  })
+})
+
+describe('reorderPdf', () => {
+  it('orders pages by the given sequence', async () => {
+    const src = await makeTestPdf(4)
+    const out = await reorderPdf({ bytes: src, order: [3, 1, 4, 2] })
+    const doc = await PDFDocument.load(out)
+    expect(doc.getPageCount()).toBe(4)
+  })
+})
+
+describe('protectPdf', () => {
+  it('produces an encrypted PDF that opens with the password', async () => {
+    const src = await makeTestPdf(2)
+    const out = await protectPdf({ bytes: src, password: 'secret123' })
+    const locked = await PDFDocument.load(out, { ignoreEncryption: true })
+    expect(locked.isEncrypted).toBe(true)
+    const opened = await PDFDocument.load(out, { password: 'secret123' })
+    expect(opened.getPageCount()).toBe(2)
+  })
+
+  it('rejects short passwords', async () => {
+    const src = await makeTestPdf(1)
+    await expect(protectPdf({ bytes: src, password: 'ab' })).rejects.toThrow('at least 4 characters')
+  })
+})
+
+describe('unlockPdf', () => {
+  it('removes encryption with the right password', async () => {
+    const src = await makeTestPdf(1)
+    const locked = await protectPdf({ bytes: src, password: 'secret123' })
+    const out = await unlockPdf({ bytes: locked, password: 'secret123' })
+    const doc = await PDFDocument.load(out)
+    expect(doc.isEncrypted).toBe(false)
+    expect(doc.getPageCount()).toBe(1)
+  })
+})
+
+describe('watermarkPdf', () => {
+  it('adds a watermark and stays valid', async () => {
+    const src = await makeTestPdf(1)
+    const out = await watermarkPdf({ bytes: src, text: 'CONFIDENTIAL', opacity: 0.2, size: 40 })
+    const doc = await PDFDocument.load(out)
+    expect(doc.getPageCount()).toBe(1)
+  })
+})
+
+describe('addPageNumbers', () => {
+  it('adds page labels and stays valid', async () => {
+    const src = await makeTestPdf(3)
+    const out = await addPageNumbers({ bytes: src, position: 'bottom-right', format: 'Page {n} of {total}' })
+    const doc = await PDFDocument.load(out)
+    expect(doc.getPageCount()).toBe(3)
+  })
+})
+
+describe('cropPdf', () => {
+  it('sets a crop box that is smaller than the media box', async () => {
+    const src = await makeTestPdf(1)
+    const out = await cropPdf({ bytes: src, margins: { top: 10, right: 10, bottom: 10, left: 10 } })
+    const doc = await PDFDocument.load(out)
+    const box = doc.getPage(0).getCropBox()
+    expect(box.width).toBeLessThan(300)
+    expect(box.height).toBeLessThan(400)
   })
 })
