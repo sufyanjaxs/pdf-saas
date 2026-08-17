@@ -4,19 +4,22 @@ import { useCallback, useState } from 'react'
 import { FileUploader } from './FileUploader'
 import { FileList } from './FileList'
 import { ProgressBar } from './ProgressBar'
-import { ResultPanel, type ResultItem } from './ResultPanel'
+import { ProcessingOverlay } from './ProcessingOverlay'
+import { PdfResultView } from './PdfResultView'
 import { ErrorAlert } from './ErrorAlert'
 import { PageGrid } from './PageGrid'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { usePdfPages } from '@/hooks/usePdfPages'
 import { usePdfWorker } from '@/hooks/usePdfWorker'
-import { defaultOutputName, resultBlobUrl } from '@/lib/client-utils'
+import { defaultOutputName } from '@/lib/client-utils'
 
 export function PdfSplitterTool() {
   const [file, setFile] = useState<File | null>(null)
   const [selected, setSelected] = useState<Set<number>>(new Set())
-  const [result, setResult] = useState<ResultItem[] | null>(null)
+  const [result, setResult] = useState<{ name: string; blob: Blob; size: number; pageCount: number } | null>(
+    null,
+  )
   const { pages, pageCount, loading, error: pageError, load } = usePdfPages()
   const worker = usePdfWorker()
 
@@ -49,16 +52,14 @@ export function PdfSplitterTool() {
       bytes: new Uint8Array(bytes),
       pages: [...selected].sort((a, b) => a - b),
     })
-    const name = defaultOutputName(file.name, 'split', 'application/pdf')
-    setResult([
-      {
-        name,
-        url: resultBlobUrl('application/pdf', res.bytes),
-        size: res.bytes.byteLength,
-        detail: `${selected.size}/${pageCount} pages`,
-      },
-    ])
-  }, [file, selected, pageCount, worker])
+    const blob = new Blob([res.bytes as BlobPart], { type: 'application/pdf' })
+    setResult({
+      name: defaultOutputName(file.name, 'split', 'application/pdf'),
+      blob,
+      size: blob.size,
+      pageCount: selected.size,
+    })
+  }, [file, selected, worker])
 
   const reset = useCallback(() => {
     setFile(null)
@@ -67,9 +68,18 @@ export function PdfSplitterTool() {
   }, [])
 
   return (
-    <Card>
+    <Card className="relative">
       {!file ? (
         <FileUploader accept="application/pdf" maxSizeMB={200} onFiles={onFiles} />
+      ) : result ? (
+        <PdfResultView
+          name={result.name}
+          file={result.blob}
+          size={result.size}
+          pageCount={result.pageCount}
+          detail={`${selected.size}/${pageCount} pages kept`}
+          onReset={reset}
+        />
       ) : (
         <div className="space-y-6">
           <FileList files={[file]} onRemove={reset} />
@@ -106,15 +116,13 @@ export function PdfSplitterTool() {
               disabled={!file || selected.size === 0 || loading}
               onClick={() => void run()}
             >
-              Split {selected.size} page{selected.size === 1 ? '' : 's'}
+              Split PDF
             </Button>
-            {worker.running && (
-              <Button variant="ghost" onClick={worker.cancel}>Cancel</Button>
-            )}
           </div>
           <ProgressBar value={worker.progress} label={worker.label} />
-
-          {result && <ResultPanel items={result} onReset={reset} />}
+          {worker.running && (
+            <ProcessingOverlay label={worker.label || 'Processing…'} progress={worker.progress} onCancel={worker.cancel} />
+          )}
         </div>
       )}
     </Card>

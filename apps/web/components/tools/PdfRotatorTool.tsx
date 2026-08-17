@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react'
 import { FileUploader } from './FileUploader'
 import { FileList } from './FileList'
 import { ProgressBar } from './ProgressBar'
+import { ProcessingOverlay } from './ProcessingOverlay'
 import { ResultPanel, type ResultItem } from './ResultPanel'
 import { ErrorAlert } from './ErrorAlert'
 import { PageGrid } from './PageGrid'
@@ -75,7 +76,7 @@ export function PdfRotatorTool() {
   }, [])
 
   return (
-    <Card>
+    <Card className="relative">
       {!file ? (
         <FileUploader accept="application/pdf" maxSizeMB={200} onFiles={onFiles} />
       ) : (
@@ -141,6 +142,7 @@ export function PdfRotatorTool() {
             </Button>
           </div>
           <ProgressBar value={worker.progress} label={worker.label} />
+          {worker.running && <ProcessingOverlay label={worker.label || 'Rotating pages…'} progress={worker.progress} onCancel={worker.cancel} />}
 
           {result && <ResultPanel items={result} onReset={reset} />}
         </div>

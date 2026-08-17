@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react'
 import { FileUploader } from './FileUploader'
 import { FileList } from './FileList'
 import { ProgressBar } from './ProgressBar'
+import { ProcessingOverlay } from './ProcessingOverlay'
 import { ResultPanel, type ResultItem } from './ResultPanel'
 import { ErrorAlert } from './ErrorAlert'
 import { PageGrid } from './PageGrid'
@@ -85,7 +86,7 @@ export function PdfToJpgTool() {
   const running = progress !== null
 
   return (
-    <Card>
+    <Card className="relative">
       {!file ? (
         <FileUploader accept="application/pdf" maxSizeMB={200} onFiles={onFiles} />
       ) : (
@@ -123,6 +124,7 @@ export function PdfToJpgTool() {
             </Button>
           </div>
           <ProgressBar value={progress} label="Rendering pages…" />
+          {running && <ProcessingOverlay label="Converting PDF to JPG…" progress={progress} />}
 
           {result && (
             <ResultPanel

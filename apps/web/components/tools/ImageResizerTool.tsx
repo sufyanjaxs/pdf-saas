@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react'
 import { FileUploader } from './FileUploader'
 import { FileList } from './FileList'
 import { ProgressBar } from './ProgressBar'
+import { ProcessingOverlay } from './ProcessingOverlay'
 import { ResultPanel, type ResultItem } from './ResultPanel'
 import { ErrorAlert } from './ErrorAlert'
 import { Button } from '@/components/ui/button'
@@ -56,7 +57,7 @@ export function ImageResizerTool() {
   }, [])
 
   return (
-    <Card>
+    <Card className="relative">
       {files.length === 0 ? (
         <FileUploader accept={ACCEPT} multiple maxSizeMB={50} minFiles={1} onFiles={(incoming) => setFiles(incoming)} />
       ) : (
@@ -109,6 +110,7 @@ export function ImageResizerTool() {
             {worker.running && <Button variant="ghost" onClick={worker.cancel}>Cancel</Button>}
           </div>
           <ProgressBar value={worker.progress} label={worker.label} />
+          {worker.running && <ProcessingOverlay label={worker.label || 'Resizing images…'} progress={worker.progress} onCancel={worker.cancel} />}
 
           {result && <ResultPanel items={result} onReset={reset} />}
         </div>

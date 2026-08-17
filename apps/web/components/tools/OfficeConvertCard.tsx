@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react'
 import { FileUploader } from './FileUploader'
 import { FileList } from './FileList'
 import { ProgressBar } from './ProgressBar'
+import { ProcessingOverlay } from './ProcessingOverlay'
 import { ResultPanel, type ResultItem } from './ResultPanel'
 import { ErrorAlert } from './ErrorAlert'
 import { Button } from '@/components/ui/button'
@@ -77,7 +78,7 @@ export function OfficeConvertCard({
   const running = progress !== null
 
   return (
-    <Card>
+    <Card className="relative">
       {!file ? (
         <FileUploader accept={accept} maxSizeMB={200} multiple={false} hint={hint} onFiles={onFiles} />
       ) : (
@@ -92,6 +93,7 @@ export function OfficeConvertCard({
             </Button>
           </div>
           <ProgressBar value={progress} label={label} />
+          {running && <ProcessingOverlay label={label || 'Converting…'} progress={progress} />}
 
           {result && (
             <ResultPanel

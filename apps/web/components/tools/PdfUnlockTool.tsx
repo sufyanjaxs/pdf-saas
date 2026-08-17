@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react'
 import { FileUploader } from './FileUploader'
 import { FileList } from './FileList'
 import { ProgressBar } from './ProgressBar'
+import { ProcessingOverlay } from './ProcessingOverlay'
 import { ResultPanel, type ResultItem } from './ResultPanel'
 import { ErrorAlert } from './ErrorAlert'
 import { Button } from '@/components/ui/button'
@@ -42,7 +43,7 @@ export function PdfUnlockTool() {
   }, [])
 
   return (
-    <Card>
+    <Card className="relative">
       {!file ? (
         <FileUploader accept="application/pdf" maxSizeMB={200} multiple={false} onFiles={onFiles} />
       ) : (
@@ -66,6 +67,7 @@ export function PdfUnlockTool() {
             Unlock PDF
           </Button>
           <ProgressBar value={worker.progress} label={worker.label} />
+          {worker.running && <ProcessingOverlay label={worker.label || 'Unlocking PDF…'} progress={worker.progress} onCancel={worker.cancel} />}
 
           {result && <ResultPanel items={result} onReset={reset} />}
         </div>

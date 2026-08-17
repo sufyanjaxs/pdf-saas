@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { FileUploader } from './FileUploader'
 import { FileList } from './FileList'
 import { ProgressBar } from './ProgressBar'
+import { ProcessingOverlay } from './ProcessingOverlay'
 import { ResultPanel, type ResultItem } from './ResultPanel'
 import { ErrorAlert } from './ErrorAlert'
 import { Button } from '@/components/ui/button'
@@ -72,7 +73,7 @@ export function ImageCropperTool() {
   const ratio = ASPECTS.find((a) => a.id === aspect)?.ratio
 
   return (
-    <Card>
+    <Card className="relative">
       {!file ? (
         <FileUploader accept={ACCEPT} maxSizeMB={50} onFiles={onFiles} />
       ) : (
@@ -101,6 +102,7 @@ export function ImageCropperTool() {
 
           {worker.error && <ErrorAlert message={worker.error} />}
           <ProgressBar value={worker.progress} label={worker.label} />
+          {worker.running && <ProcessingOverlay label={worker.label || 'Cropping image…'} progress={worker.progress} onCancel={worker.cancel} />}
           {result && <ResultPanel items={result} onReset={reset} />}
         </div>
       )}

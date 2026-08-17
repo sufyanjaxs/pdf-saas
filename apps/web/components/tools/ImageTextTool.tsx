@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from 'react'
 import { FileUploader } from './FileUploader'
 import { FileList } from './FileList'
 import { ProgressBar } from './ProgressBar'
+import { ProcessingOverlay } from './ProcessingOverlay'
 import { ResultPanel, type ResultItem } from './ResultPanel'
 import { ErrorAlert } from './ErrorAlert'
 import { Button } from '@/components/ui/button'
@@ -105,7 +106,7 @@ export function ImageTextTool() {
   }, [])
 
   return (
-    <Card>
+    <Card className="relative">
       {!file ? (
         <FileUploader accept="image/*" maxSizeMB={200} multiple={false} onFiles={onFiles} />
       ) : (
@@ -171,6 +172,7 @@ export function ImageTextTool() {
             Add Text
           </Button>
           <ProgressBar value={progress} label="Rendering image…" />
+          {progress !== null && <ProcessingOverlay label="Adding text to image…" progress={progress} />}
 
           {result && <ResultPanel items={result} onReset={reset} />}
         </div>

@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react'
 import { FileUploader } from './FileUploader'
 import { FileList } from './FileList'
 import { ProgressBar } from './ProgressBar'
+import { ProcessingOverlay } from './ProcessingOverlay'
 import { ResultPanel, type ResultItem } from './ResultPanel'
 import { ErrorAlert } from './ErrorAlert'
 import { Button } from '@/components/ui/button'
@@ -48,7 +49,7 @@ export function PdfMergerTool() {
   }, [])
 
   return (
-    <Card>
+    <Card className="relative">
       {files.length === 0 ? (
         <FileUploader
           accept="application/pdf"
@@ -86,6 +87,7 @@ export function PdfMergerTool() {
             {worker.running && <Button variant="ghost" onClick={worker.cancel}>Cancel</Button>}
           </div>
           <ProgressBar value={worker.progress} label={worker.label} />
+          {worker.running && <ProcessingOverlay label={worker.label || 'Merging PDFs…'} progress={worker.progress} onCancel={worker.cancel} />}
 
           {result && <ResultPanel items={result} onReset={reset} />}
         </div>
