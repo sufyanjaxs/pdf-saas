@@ -45,6 +45,10 @@ export interface MergeInput {
 export interface ImagesToPdfInput {
   files: Uint8Array[];
   mimes: string[];
+  pageSize?: [number, number];
+  orientation?: 'auto' | 'portrait' | 'landscape';
+  margin?: number;
+  fitMode?: 'contain' | 'fill';
 }
 export interface CompressInput {
   bytes: Uint8Array;
@@ -343,6 +347,7 @@ export async function textToPdf(input: { text: string; pageSize?: [number, numbe
 export async function imagesToPdf(input: ImagesToPdfInput): Promise<Uint8Array> {
   if (input.files.length === 0) throw new Error('Add at least one image.');
   const out = await PDFDocument.create();
+  const baseMargin = input.margin ?? 12;
   for (let i = 0; i < input.files.length; i++) {
     const mime = input.mimes[i] ?? 'image/jpeg';
     let image;
@@ -354,13 +359,21 @@ export async function imagesToPdf(input: ImagesToPdfInput): Promise<Uint8Array> 
       image = await out.embedJpg(input.files[i]);
     }
     const { width, height } = image.scale(1);
-    // A4 portrait with a small margin; keep aspect ratio.
-    const pageW = 595.28;
-    const pageH = 841.89;
-    const margin = 12;
-    const maxW = pageW - margin * 2;
-    const maxH = pageH - margin * 2;
-    const scale = Math.min(maxW / width, maxH / height, 1);
+    let pageW: number;
+    let pageH: number;
+    if (input.pageSize) {
+      pageW = input.pageSize[0];
+      pageH = input.pageSize[1];
+      if (input.orientation === 'portrait') { pageW = Math.min(pageW, pageH); pageH = Math.max(input.pageSize[0], input.pageSize[1]); }
+      else if (input.orientation === 'landscape') { pageW = Math.max(pageW, pageH); pageH = Math.min(input.pageSize[0], input.pageSize[1]); }
+      else { if (width > height) { pageW = Math.max(pageW, pageH); pageH = Math.min(input.pageSize[0], input.pageSize[1]); } }
+    } else {
+      pageW = width + baseMargin * 2;
+      pageH = height + baseMargin * 2;
+    }
+    const maxW = pageW - baseMargin * 2;
+    const maxH = pageH - baseMargin * 2;
+    const scale = input.fitMode === 'fill' ? Math.max(maxW / width, maxH / height) : Math.min(maxW / width, maxH / height, 1);
     const w = width * scale;
     const h = height * scale;
     const page = out.addPage([pageW, pageH]);

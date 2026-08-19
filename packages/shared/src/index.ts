@@ -78,6 +78,10 @@ export interface MergePayload {
 export interface ImagesToPdfPayload {
   files: Uint8Array[];
   mimes: string[];
+  pageSize?: [number, number];
+  orientation?: 'auto' | 'portrait' | 'landscape';
+  margin?: number;
+  fitMode?: 'contain' | 'fill';
 }
 
 export interface CompressPayload {
@@ -180,6 +184,37 @@ export interface ImageResult {
   width: number;
   height: number;
   size: number;
+}
+
+export interface CompressAdvancedPayload {
+  files: ImageBlobPayload[];
+  opts: {
+    format?: 'image/jpeg' | 'image/webp' | 'image/png' | null;
+    quality?: number;
+    targetSizeKB?: number;
+    minQuality?: number;
+    maxQuality?: number;
+  };
+}
+
+export interface AnalyzePayload {
+  files: ImageBlobPayload[];
+}
+
+export interface CircleCropPayload {
+  files: ImageBlobPayload[];
+  opts: {
+    bgColor?: string;
+    borderWidth?: number;
+    borderColor?: string;
+  };
+}
+
+export interface FillBackgroundPayload {
+  files: ImageBlobPayload[];
+  opts: {
+    color: string;
+  };
 }
 
 /* ------------------------------------------------------------------ */

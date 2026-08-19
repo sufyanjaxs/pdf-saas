@@ -1,13 +1,18 @@
 /**
  * Image processing Web Worker.
- * Runs resize / crop / compress / convert via OffscreenCanvas so heavy pixel
- * work never blocks the main thread.
+ * Runs resize / crop / compress / convert / analyze via OffscreenCanvas
+ * so heavy pixel work never blocks the main thread.
  */
 import {
   resizeImage,
   cropImage,
   convertImage,
   compressImage,
+  compressImageAdvanced,
+  analyzeImage,
+  circleCrop,
+  circleCropWithBackground,
+  fillBackground,
   getImageInfo,
   formatToExtension,
   type ImageFormat,
@@ -20,6 +25,9 @@ import type {
   ResizePayload,
   CompressImagePayload,
   CropPayload,
+  CompressAdvancedPayload,
+  AnalyzePayload,
+  CircleCropPayload,
 } from '@pdf-saas/shared'
 
 const CHUNK = 0.85
@@ -50,7 +58,6 @@ async function processOne(
   outputName: string,
 ): Promise<{ mime: string; bytes: string; width: number; height: number; size: number; name: string }> {
   const input = payloadToBlob(blobPayload)
-  const info = await getImageInfo(input)
   let out: Blob
 
   if (operation === 'resize') {
@@ -91,7 +98,7 @@ async function handle(ev: MessageEvent<WorkerRequest>) {
 
   try {
     if (operation === 'info') {
-      const p = payload as { files: ImageBlobPayload[] }
+      const p = payload as AnalyzePayload
       const infos = []
       for (let i = 0; i < p.files.length; i++) {
         const info = await getImageInfo(payloadToBlob(p.files[i]))
@@ -99,6 +106,103 @@ async function handle(ev: MessageEvent<WorkerRequest>) {
         sendProgress(id, ((i + 1) / p.files.length) * 100, `Reading image ${i + 1}/${p.files.length}`)
       }
       sendResult(id, infos)
+      return
+    }
+
+    if (operation === 'analyze') {
+      const p = payload as AnalyzePayload
+      const analyses = []
+      for (let i = 0; i < p.files.length; i++) {
+        const analysis = await analyzeImage(payloadToBlob(p.files[i]))
+        analyses.push({ ...analysis, name: p.files[i].name })
+        sendProgress(id, ((i + 1) / p.files.length) * 100, `Analyzing image ${i + 1}/${p.files.length}`)
+      }
+      sendResult(id, analyses)
+      return
+    }
+
+    if (operation === 'compress-advanced') {
+      const p = payload as CompressAdvancedPayload
+      const results = []
+      for (let i = 0; i < p.files.length; i++) {
+        sendProgress(id, ((i + CHUNK) / p.files.length) * 100, `Compressing ${i + 1}/${p.files.length}`)
+        const input = payloadToBlob(p.files[i])
+        const res = await compressImageAdvanced(input, {
+          format: p.opts.format ?? undefined,
+          quality: p.opts.quality,
+          targetSizeKB: p.opts.targetSizeKB,
+          minQuality: p.opts.minQuality,
+          maxQuality: p.opts.maxQuality,
+        })
+        const arr = new Uint8Array(await res.blob.arrayBuffer())
+        const ext = formatToExtension(res.format)
+        const dot = p.files[i].name.lastIndexOf('.')
+        const base = dot === -1 ? p.files[i].name : p.files[i].name.slice(0, dot)
+        results.push({
+          mime: res.blob.type,
+          bytes: uint8ToBase64(arr),
+          width: res.width,
+          height: res.height,
+          size: arr.length,
+          name: `${base}.${ext}`,
+          quality: res.quality,
+        })
+      }
+      sendResult(id, results)
+      return
+    }
+
+    if (operation === 'circle-crop') {
+      const p = payload as CircleCropPayload
+      const results = []
+      for (let i = 0; i < p.files.length; i++) {
+        sendProgress(id, ((i + CHUNK) / p.files.length) * 100, `Processing ${i + 1}/${p.files.length}`)
+        const input = payloadToBlob(p.files[i])
+        let out: Blob
+        if (p.opts.bgColor) {
+          out = await circleCropWithBackground(input, p.opts.bgColor, p.opts.borderWidth ?? 0, p.opts.borderColor ?? '#ffffff')
+        } else {
+          out = await circleCrop(input)
+        }
+        const outInfo = await getImageInfo(out)
+        const arr = new Uint8Array(await out.arrayBuffer())
+        const dot = p.files[i].name.lastIndexOf('.')
+        const base = dot === -1 ? p.files[i].name : p.files[i].name.slice(0, dot)
+        results.push({
+          mime: 'image/png',
+          bytes: uint8ToBase64(arr),
+          width: outInfo.width,
+          height: outInfo.height,
+          size: arr.length,
+          name: `${base}-circle.png`,
+        })
+      }
+      sendResult(id, results)
+      return
+    }
+
+    if (operation === 'fill-background') {
+      const p = payload as { files: ImageBlobPayload[]; opts: { color: string } }
+      const results = []
+      for (let i = 0; i < p.files.length; i++) {
+        sendProgress(id, ((i + CHUNK) / p.files.length) * 100, `Processing ${i + 1}/${p.files.length}`)
+        const input = payloadToBlob(p.files[i])
+        const out = await fillBackground(input, p.opts.color)
+        const outInfo = await getImageInfo(out)
+        const arr = new Uint8Array(await out.arrayBuffer())
+        const ext = formatToExtension(out.type as ImageFormat)
+        const dot = p.files[i].name.lastIndexOf('.')
+        const base = dot === -1 ? p.files[i].name : p.files[i].name.slice(0, dot)
+        results.push({
+          mime: out.type,
+          bytes: uint8ToBase64(arr),
+          width: outInfo.width,
+          height: outInfo.height,
+          size: arr.length,
+          name: `${base}.${ext}`,
+        })
+      }
+      sendResult(id, results)
       return
     }
 

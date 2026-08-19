@@ -22,6 +22,11 @@ import {
   Frame,
   Shuffle,
   Type,
+  Circle,
+  UserCheck,
+  Eraser,
+  ScanSearch,
+  Maximize,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -49,6 +54,11 @@ export type ToolIconName =
   | 'frame'
   | 'shuffle'
   | 'type'
+  | 'circle'
+  | 'passport'
+  | 'eraser'
+  | 'scan-search'
+  | 'maximize'
 
 const icons: Record<ToolIconName, LucideIcon> = {
   'file-split': FileStack,
@@ -74,6 +84,11 @@ const icons: Record<ToolIconName, LucideIcon> = {
   frame: Frame,
   shuffle: Shuffle,
   type: Type,
+  circle: Circle,
+  passport: UserCheck,
+  eraser: Eraser,
+  'scan-search': ScanSearch,
+  maximize: Maximize,
 }
 
 export function ToolIcon({ name, className }: { name: ToolIconName; className?: string }) {
