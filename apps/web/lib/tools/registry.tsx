@@ -44,7 +44,7 @@ const loaders: Record<string, () => Promise<{ default: ComponentType }>> = {
   'image-text': () => import('@/components/tools/ImageTextTool').then((m) => ({ default: m.ImageTextTool })),
   'image-passport': () => import('@/components/tools/PassportPhotoTool').then((m) => ({ default: m.PassportPhotoTool })),
   'image-circle': () => import('@/components/tools/CircleImageTool').then((m) => ({ default: m.CircleImageTool })),
-  'image-background remover': () => import('@/components/tools/BackgroundRemoverTool').then((m) => ({ default: m.BackgroundRemoverTool })),
+  'image-bg-remover': () => import('@/components/tools/BackgroundRemoverTool').then((m) => ({ default: m.BackgroundRemoverTool })),
   'image-quality': () => import('@/components/tools/ImageQualityAnalyzerTool').then((m) => ({ default: m.ImageQualityAnalyzerTool })),
   'image-resize-purpose': () => import('@/components/tools/ResizeForPurposeTool').then((m) => ({ default: m.ResizeForPurposeTool })),
   'pdf-protector': () => import('@/components/tools/PdfProtectTool').then((m) => ({ default: m.PdfProtectTool })),

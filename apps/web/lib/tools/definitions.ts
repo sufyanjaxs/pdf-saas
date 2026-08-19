@@ -206,7 +206,7 @@ export const toolDefinitions: ToolDefinition[] = [
     ['circle image', 'circular crop', 'round image', 'circle crop'],
   ),
   def(
-    'image-background remover',
+    'image-bg-remover',
     'Remove Background',
     'Remove BG',
     'Image',
