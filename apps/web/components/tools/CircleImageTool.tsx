@@ -3,7 +3,6 @@
 import { useCallback, useState } from 'react'
 import { FileUploader } from './FileUploader'
 import { FileList } from './FileList'
-import { ProgressBar } from './ProgressBar'
 import { ProcessingOverlay } from './ProcessingOverlay'
 import { ResultPanel, type ResultItem } from './ResultPanel'
 import { ErrorAlert } from './ErrorAlert'
@@ -11,129 +10,127 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useImageWorker } from '@/hooks/useImageWorker'
 import { fileToImagePayload, resultBlobUrl } from '@/lib/client-utils'
+import { Circle, Download } from 'lucide-react'
 
-const ACCEPT = 'image/jpeg,image/png,image/webp'
-
-const BG_OPTIONS = [
-  { id: 'transparent', name: 'Transparent', color: '' },
-  { id: 'white', name: 'White', color: '#ffffff' },
-  { id: 'black', name: 'Black', color: '#000000' },
-  { id: 'gray', name: 'Gray', color: '#95a5a6' },
-  { id: 'blue', name: 'Blue', color: '#3498db' },
-  { id: 'red', name: 'Red', color: '#e74c3c' },
-  { id: 'green', name: 'Green', color: '#2ecc71' },
-  { id: 'custom', name: 'Custom', color: '' },
-]
+const ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,image/bmp'
+const SIZES = [64, 128, 256, 400, 512, 800, 1024]
 
 export function CircleImageTool() {
   const [files, setFiles] = useState<File[]>([])
-  const [bgOption, setBgOption] = useState('transparent')
-  const [customBg, setCustomBg] = useState('#ffffff')
-  const [borderWidth, setBorderWidth] = useState(0)
+  const [size, setSize] = useState(256)
+  const [border, setBorder] = useState(4)
   const [borderColor, setBorderColor] = useState('#ffffff')
   const [result, setResult] = useState<ResultItem[] | null>(null)
   const worker = useImageWorker()
-
-  const bgColor = bgOption === 'custom' ? customBg : BG_OPTIONS.find((b) => b.id === bgOption)?.color ?? ''
 
   const run = useCallback(async () => {
     if (files.length === 0) return
     setResult(null)
     const payloads = await Promise.all(files.map((f) => fileToImagePayload(f)))
-
-    const res = await worker.run('circle-crop', {
-      files: payloads,
-      opts: {
-        bgColor: bgColor || undefined,
-        borderWidth,
-        borderColor,
-      },
+    const [squareStep] = await worker.run('resize', {
+      files: payloads, opts: { width: size + border * 2, height: size + border * 2, fit: 'cover' }
     })
-
+    const res = await worker.run('circle', {
+      files: [{ bytes: squareStep.bytes, mime: squareStep.mime, name: squareStep.name }],
+      opts: { size, borderColor, borderWidth: border }
+    })
     const items: ResultItem[] = res.map((r: any) => ({
-      name: r.name,
-      url: resultBlobUrl(r.mime, r.bytes),
-      size: r.size,
-      detail: `${r.width}x${r.height} | PNG`,
+      name: r.name, url: resultBlobUrl(r.mime, r.bytes), size: r.size, detail: `${r.width}×${r.height}px | Circle`
     }))
     setResult(items)
-  }, [files, bgColor, borderWidth, borderColor, worker])
+  }, [files, size, border, borderColor, worker])
 
-  const reset = useCallback(() => {
-    setFiles([])
-    setResult(null)
-  }, [])
+  const reset = useCallback(() => { setFiles([]); setResult(null) }, [])
 
   return (
     <Card className="relative">
       {files.length === 0 ? (
-        <FileUploader accept={ACCEPT} multiple maxSizeMB={50} minFiles={1} onFiles={(incoming) => setFiles(incoming)} />
+        <FileUploader accept={ACCEPT} multiple maxSizeMB={50} onFiles={(incoming) => setFiles(incoming)} />
       ) : (
         <div className="space-y-6">
           <FileList files={files} onRemove={(i) => setFiles((p) => p.filter((_, j) => j !== i))} />
 
-          {/* Background */}
+          {/* Live circle preview */}
+          <div className="flex justify-center">
+            {files[0] && (
+              <CirclePreview file={files[0]} size={size} border={border} borderColor={borderColor} />
+            )}
+          </div>
+
+          {/* Size */}
           <div>
-            <h3 className="mb-2 text-sm font-semibold text-slate-700">Background</h3>
+            <h3 className="mb-2 text-sm font-semibold text-slate-700">Output Size</h3>
             <div className="flex flex-wrap gap-2">
-              {BG_OPTIONS.map((bg) => (
-                <button
-                  key={bg.id}
-                  type="button"
-                  onClick={() => setBgOption(bg.id)}
-                  className={`flex items-center gap-2 rounded-lg border-2 px-3 py-2 text-sm transition-colors ${
-                    bgOption === bg.id ? 'border-brand-600 bg-brand-50' : 'border-slate-200 hover:border-brand-300'
-                  }`}
-                >
-                  {bg.id === 'transparent' ? (
-                    <span className="h-4 w-4 rounded-full border-2 border-dashed border-slate-300 bg-white" />
-                  ) : bg.id === 'custom' ? (
-                    <input type="color" value={customBg} onChange={(e) => { setCustomBg(e.target.value); setBgOption('custom') }}
-                      className="h-4 w-4 cursor-pointer border-0 p-0" />
-                  ) : (
-                    <span className="h-4 w-4 rounded-full border border-slate-200" style={{ backgroundColor: bg.color }} />
-                  )}
-                  <span className="text-slate-700">{bg.name}</span>
-                </button>
+              {SIZES.map((s) => (
+                <button key={s} type="button" onClick={() => setSize(s)}
+                  className={`rounded-lg border-2 px-3 py-1.5 text-sm font-medium transition-colors ${
+                    size === s ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-600 hover:border-brand-300'
+                  }`}>{s}px</button>
               ))}
             </div>
           </div>
 
           {/* Border */}
-          <div className="grid gap-6 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-sm font-semibold text-slate-700">Border Width (px)</label>
-              <input type="range" min={0} max={20} value={borderWidth} onChange={(e) => setBorderWidth(Number(e.target.value))} className="w-full accent-brand-600" />
-              <span className="text-xs text-slate-400">{borderWidth}px</span>
+          <div>
+            <h3 className="mb-2 text-sm font-semibold text-slate-700">Border Width</h3>
+            <div className="flex items-center gap-3">
+              <input type="range" min={0} max={20} value={border} onChange={(e) => setBorder(Number(e.target.value))} className="flex-1 accent-brand-600" />
+              <span className="w-12 text-center text-sm font-bold text-slate-700">{border}px</span>
             </div>
-            <div>
-              <label className="mb-1 block text-sm font-semibold text-slate-700">Border Color</label>
-              <div className="flex items-center gap-2">
-                <input type="color" value={borderColor} onChange={(e) => setBorderColor(e.target.value)} className="h-8 w-8 cursor-pointer rounded border" />
-                <span className="text-xs text-slate-400">{borderColor}</span>
+            {border > 0 && (
+              <div className="mt-2">
+                <label className="mb-1 block text-xs font-medium text-slate-500">Border Color</label>
+                <div className="flex gap-2">
+                  {['#ffffff', '#000000', '#3b82f6', '#22c55e', '#ef4444', '#f59e0b'].map((c) => (
+                    <button key={c} type="button" onClick={() => setBorderColor(c)}
+                      className={`h-8 w-8 rounded-full border-2 transition-colors ${borderColor === c ? 'border-brand-600 scale-110' : 'border-slate-200 hover:scale-105'}`}
+                      style={{ backgroundColor: c }} />
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
-          {/* Preview hint */}
-          <div className="rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
-            Output is always transparent PNG. Circle crop centers on the image and takes the largest possible circle.
-          </div>
+          {/* Result preview */}
+          {result && (
+            <div className="flex justify-center gap-4">
+              {result.map((item, i) => (
+                <div key={i} className="text-center">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={item.url} alt="Circle result" className="rounded-full border border-slate-200 shadow-sm" style={{ width: Math.min(size, 200), height: Math.min(size, 200) }} />
+                  <p className="mt-1 text-xs text-slate-400">{item.detail}</p>
+                </div>
+              ))}
+            </div>
+          )}
 
           {worker.error && <ErrorAlert message={worker.error} />}
 
           <div className="flex items-center gap-3">
             <Button size="lg" loading={worker.running} disabled={files.length === 0} onClick={() => void run()}>
-              Create Circle Image{files.length > 1 ? 's' : ''}
+              <Circle className="mr-1 h-4 w-4" /> Make Circle {files.length === 1 ? '' : `(${files.length})`}
             </Button>
             {worker.running && <Button variant="ghost" onClick={worker.cancel}>Cancel</Button>}
           </div>
-          <ProgressBar value={worker.progress} label={worker.label} />
-          {worker.running && <ProcessingOverlay label={worker.label || 'Creating circle images...'} progress={worker.progress} onCancel={worker.cancel} />}
-
+          {worker.running && <ProcessingOverlay label={worker.label || 'Creating circle image...'} progress={worker.progress} onCancel={worker.cancel} />}
           {result && <ResultPanel items={result} onReset={reset} />}
         </div>
       )}
     </Card>
+  )
+}
+
+function CirclePreview({ file, size, border, borderColor }: { file: File; size: number; border: number; borderColor: string }) {
+  const displaySize = Math.min(size, 200)
+  const previewUrl = URL.createObjectURL(file)
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <div className="relative rounded-full border-2 border-slate-200 overflow-hidden" style={{ width: displaySize, height: displaySize }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={previewUrl} alt="Preview" className="h-full w-full object-cover" />
+        <div className="absolute inset-0 rounded-full border-2" style={{ borderColor, borderWidth: border }} />
+      </div>
+      <p className="text-xs text-slate-400">Preview at {displaySize}px</p>
+    </div>
   )
 }

@@ -3,132 +3,224 @@
 import { useCallback, useState } from 'react'
 import { FileUploader } from './FileUploader'
 import { FileList } from './FileList'
-import { ProgressBar } from './ProgressBar'
-import { ProcessingOverlay } from './ProcessingOverlay'
+import { ResultPanel, type ResultItem } from './ResultPanel'
 import { ErrorAlert } from './ErrorAlert'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useImageWorker } from '@/hooks/useImageWorker'
-import { fileToImagePayload } from '@/lib/client-utils'
-import { formatBytes } from '@pdf-saas/file-utils'
-import { ArrowRight, Info } from 'lucide-react'
+import { fileToImagePayload, resultBlobUrl } from '@/lib/client-utils'
+import { ArrowLeft, Camera, Star, FileText, Gauge, Layers, Image as ImageIcon, Download } from 'lucide-react'
+import Link from 'next/link'
 
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,image/bmp'
+type ToolTab = 'upload' | 'results'
 
-interface AnalysisResult {
-  name: string; width: number; height: number; mime: string; size: number
-  aspectRatio: number; megapixels: number; hasAlpha: boolean; format: string
-  estimatedQuality: number; complexity: number; qualityLabel: string
+const TOOL_SLUGS = [
+  { slug: 'image-resize', label: 'Resize', icon: '↔️', desc: 'Change image dimensions' },
+  { slug: 'image-compress', label: 'Compress', icon: '📦', desc: 'Reduce file size' },
+  { slug: 'image-crop', label: 'Crop', icon: '✂️', desc: 'Crop to focus area' },
+  { slug: 'image-converter', label: 'Convert Format', icon: '🔄', desc: 'Convert to JPG/PNG/WebP' },
+]
+
+interface AnalysisData {
+  verdict: string
+  score: number
+  fileSize: number
+  mimeType: string
+  imgWidth: number
+  imgHeight: number
+  megapixels: number
+  aspectRatio: number
+  format: string
+  qualityIssues: string[]
+  recommendations: { title: string; description: string; tool: string; action: string }[]
 }
 
-interface ToolRecommendation { tool: string; slug: string; reason: string }
+function getVerdict(score: number): string {
+  if (score >= 90) return 'Excellent quality'
+  if (score >= 75) return 'Good quality'
+  if (score >= 50) return 'Average quality — improvements possible'
+  if (score >= 30) return 'Below average — room for improvement'
+  return 'Poor quality — significant issues detected'
+}
 
-function getRecommendations(a: AnalysisResult): ToolRecommendation[] {
-  const recs: ToolRecommendation[] = []
-  if (a.size > 2_000_000) recs.push({ tool: 'Image Compressor', slug: 'image-compressor', reason: `${formatBytes(a.size)} is quite large. Compress to reduce file size for faster loading.` })
-  if (a.megapixels > 8) recs.push({ tool: 'Image Resizer', slug: 'image-resizer', reason: `${a.width}x${a.height} (${a.megapixels.toFixed(1)}MP) is larger than most web and social platforms need.` })
-  if (a.format === 'PNG' && a.size > 500_000 && !a.hasAlpha) recs.push({ tool: 'Image Converter', slug: 'image-converter', reason: 'This PNG does not use transparency. Converting to JPG can significantly reduce file size.' })
-  if (a.complexity > 0.6 && a.size > 1_000_000) recs.push({ tool: 'Image Compressor', slug: 'image-compressor', reason: 'High-detail image with large file size. Advanced compression preserves detail while reducing size.' })
-  if (a.width !== a.height && Math.abs(a.aspectRatio - 1) < 0.05) recs.push({ tool: 'Image Cropper', slug: 'image-cropper', reason: 'Almost square. Crop to perfect 1:1 for social media profiles and posts.' })
-  if (a.width > 1080 && a.height > 1080) recs.push({ tool: 'Resize for Purpose', slug: 'image-resize-purpose', reason: 'Dimensions exceed most platform requirements. Resize for a specific use case.' })
-  if (a.estimatedQuality < 50) recs.push({ tool: 'Image Quality Analyzer', slug: 'image-quality', reason: 'Low estimated quality. This image may have been compressed multiple times already.' })
-  if (recs.length === 0) recs.push({ tool: 'Image Compressor', slug: 'image-compressor', reason: 'Image looks good. A light compression pass can still optimize it for web.' })
-  return recs
+function getColor(score: number): string {
+  if (score >= 90) return 'text-emerald-600'
+  if (score >= 75) return 'text-blue-600'
+  if (score >= 50) return 'text-amber-600'
+  if (score >= 30) return 'text-orange-600'
+  return 'text-red-600'
+}
+
+function getBgColor(score: number): string {
+  if (score >= 90) return 'from-emerald-50 to-teal-50'
+  if (score >= 75) return 'from-blue-50 to-cyan-50'
+  if (score >= 50) return 'from-amber-50 to-yellow-50'
+  if (score >= 30) return 'from-orange-50 to-red-50'
+  return 'from-red-50 to-rose-50'
+}
+
+function analyzeFile(file: File, dims: { width: number; height: number }): AnalysisData {
+  const megapixels = (dims.width * dims.height) / 1_000_000
+  const aspectRatio = dims.width / dims.height
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? 'unknown'
+  const format = ext === 'jpg' ? 'JPEG' : ext === 'jpeg' ? 'JPEG' : ext.toUpperCase()
+
+  let score = 80
+  const qualityIssues: string[] = []
+  const recommendations: { title: string; description: string; tool: string; action: string }[] = []
+
+  if (megapixels >= 12) { score += 15; score = Math.min(score, 100) } else if (megapixels >= 5) { score += 8; score = Math.min(score, 100) }
+  else if (megapixels < 0.3) { score -= 25; qualityIssues.push('Very low resolution — fewer than 0.3 megapixels') }
+  else if (megapixels < 1) { score -= 10; qualityIssues.push('Low resolution — under 1 megapixel') }
+
+  const shortSide = Math.min(dims.width, dims.height)
+  if (dims.width > 8000 || dims.height > 8000) { score -= 10; qualityIssues.push('Unusually large dimensions — potential overkill for most uses') }
+  if (shortSide < 200 && file.size > 500_000) { score -= 15; qualityIssues.push('Small image with unusually high file size — possible poor compression') }
+
+  const bytesPerPixel = file.size / (dims.width * dims.height)
+  const bppKB = bytesPerPixel * 1024
+  if (ext === 'jpg' || ext === 'jpeg') {
+    if (bppKB < 0.03) { score -= 15; qualityIssues.push('Heavily compressed JPEG — likely visible compression artifacts') }
+    else if (bppKB < 0.06) { score -= 5; qualityIssues.push('Light JPEG compression detected') }
+  }
+  if (ext === 'png' && file.size > 10_000_000) { qualityIssues.push('Very large PNG — may benefit from conversion or recompression') }
+
+  const mins = [800, 1200, 1920, 3840]
+  const idealPx = mins.filter((m) => dims.width >= m || dims.height >= m).pop() ?? mins[0]
+
+  if (dims.width > 4000 || dims.height > 4000) {
+    score -= 5
+    qualityIssues.push('Over 4000px — may be too large for web or social media')
+    recommendations.push({ title: 'Resize for sharing', description: `Reduce from ${dims.width}×${dims.height} to a web-friendly ${idealPx}px on the long side.`, tool: 'image-resize', action: `Resize to ${idealPx}px` })
+  }
+
+  if (file.size > 5_000_000 && (ext === 'jpg' || ext === 'jpeg' || ext === 'png')) {
+    score -= 10
+    qualityIssues.push('Large file size — may be slow to load or upload')
+    recommendations.push({ title: 'Compress to save space', description: 'Reduce file size while keeping visual quality high.', tool: 'image-compress', action: 'Compress this image' })
+  }
+
+  const raw = megapixels * 0.5
+  const overall = raw + score * 0.5
+  const finalScore = Math.max(0, Math.min(100, Math.round(overall)))
+
+  if (ext === 'png' && !qualityIssues.some((i) => i.includes('PNG'))) {
+    recommendations.push({ title: 'Convert to JPG', description: 'If no transparency needed, JPG can dramatically reduce size.', tool: 'image-converter', action: 'Convert to JPG' })
+  }
+  if (recommendations.length === 0) {
+    recommendations.push({ title: 'Resize for web', description: `Resize to ${idealPx}px for fast loading.`, tool: 'image-resize', action: `Resize to ${idealPx}px` })
+  }
+
+  return {
+    verdict: getVerdict(finalScore), score: finalScore, fileSize: file.size, mimeType: file.type,
+    imgWidth: dims.width, imgHeight: dims.height, megapixels, aspectRatio, format, qualityIssues, recommendations,
+  }
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 export function ImageQualityAnalyzerTool() {
+  const [tab, setTab] = useState<ToolTab>('upload')
   const [files, setFiles] = useState<File[]>([])
-  const [result, setResult] = useState<AnalysisResult[] | null>(null)
-  const [recommendations, setRecommendations] = useState<ToolRecommendation[]>([])
+  const [analysis, setAnalysis] = useState<AnalysisData | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [result, setResult] = useState<ResultItem[] | null>(null)
   const worker = useImageWorker()
 
-  const run = useCallback(async () => {
-    if (files.length === 0) return
-    setResult(null); setRecommendations([])
-    const payloads = await Promise.all(files.map((f) => fileToImagePayload(f)))
-    const analyses = await worker.run('analyze', { files: payloads }) as unknown as AnalysisResult[]
-    setResult(analyses)
-    const allRecs: ToolRecommendation[] = []
-    for (const a of analyses) {
-      for (const r of getRecommendations(a)) {
-        if (!allRecs.some((e) => e.slug === r.slug)) allRecs.push(r)
-      }
-    }
-    setRecommendations(allRecs)
-  }, [files, worker])
+  const onFiles = useCallback(async (incoming: File[]) => {
+    const file = incoming[0]; if (!file) return
+    setFiles(incoming); setResult(null)
+    await fileToImagePayload(file)
+    const dims = await new Promise<{ width: number; height: number }>((r) => {
+      const img = new Image(); img.onload = () => { r({ width: img.naturalWidth, height: img.naturalHeight }); URL.revokeObjectURL(img.src) }
+      img.src = URL.createObjectURL(file)
+    })
+    setAnalysis(analyzeFile(file, dims)); setPreviewUrl(URL.createObjectURL(file)); setTab('results')
+  }, [])
 
-  const reset = useCallback(() => { setFiles([]); setResult(null); setRecommendations([]) }, [])
+  const reset = useCallback(() => { setFiles([]); setAnalysis(null); setResult(null); setPreviewUrl(null); setTab('upload') }, [])
 
   return (
     <Card className="relative">
-      {files.length === 0 ? (
-        <FileUploader accept={ACCEPT} multiple maxSizeMB={200} minFiles={1} onFiles={(incoming) => setFiles(incoming)} />
-      ) : (
+      {tab === 'upload' ? (
+        <FileUploader accept={ACCEPT} maxSizeMB={50} multiple={false} onFiles={(incoming) => void onFiles(incoming)}
+          hint="Upload a JPG, PNG, WebP, GIF, or BMP image to analyze" />
+      ) : analysis && (
         <div className="space-y-6">
-          <FileList files={files} onRemove={(i) => setFiles((p) => p.filter((_, j) => j !== i))} />
-          {worker.error && <ErrorAlert message={worker.error} />}
+          <button type="button" onClick={reset} className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 transition-colors">
+            <ArrowLeft className="h-4 w-4" /> Analyze another image
+          </button>
 
-          <div className="rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700">
-            <div className="flex items-start gap-2">
-              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              <p>Quality estimates are approximate and based on file size relative to image dimensions. They provide a general indication — not a precise measurement.</p>
-            </div>
+          {files[0] && <FileList files={[files[0]]} onRemove={reset} />}
+
+          <div className={`rounded-xl bg-gradient-to-br p-5 text-center ${getBgColor(analysis.score)}`}>
+            <Camera className={`mx-auto mb-2 h-6 w-6 ${getColor(analysis.score)}`} />
+            <p className={`text-3xl font-black ${getColor(analysis.score)}`}>{analysis.score}/100</p>
+            <p className="text-sm text-slate-600 mt-1">{analysis.verdict}</p>
           </div>
 
-          <div className="flex items-center gap-3">
-            <Button size="lg" loading={worker.running} disabled={files.length === 0} onClick={() => void run()}>
-              Analyze {files.length} Image{files.length === 1 ? '' : 's'}
-            </Button>
-          </div>
-          <ProgressBar value={worker.progress} label={worker.label} />
-          {worker.running && <ProcessingOverlay label={worker.label || 'Analyzing...'} progress={worker.progress} onCancel={worker.cancel} />}
-
-          {result && result.map((a, i) => (
-            <div key={i} className="rounded-xl border border-slate-200 bg-white p-5">
-              <h4 className="mb-3 text-sm font-semibold text-slate-800">{a.name}</h4>
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-                <InfoRow label="Dimensions" value={`${a.width} x ${a.height}`} />
-                <InfoRow label="Megapixels" value={`${a.megapixels.toFixed(2)} MP`} />
-                <InfoRow label="File Size" value={formatBytes(a.size)} />
-                <InfoRow label="Format" value={a.format} />
-                <InfoRow label="Aspect Ratio" value={a.aspectRatio.toFixed(2)} />
-                <InfoRow label="Bytes/Pixel" value={(a.size / (a.width * a.height || 1)).toFixed(2)} />
-                <InfoRow label="Has Alpha" value={a.hasAlpha ? 'Yes' : 'No'} />
-                <InfoRow label="Complexity" value={`${(a.complexity * 100).toFixed(0)}%`} />
-                <InfoRow label="Est. Quality" value={<span className={a.estimatedQuality >= 85 ? 'text-emerald-600' : a.estimatedQuality >= 65 ? 'text-amber-600' : 'text-red-500'}>{a.qualityLabel} ({a.estimatedQuality}%)</span>} />
-              </div>
-              <div className="mt-4">
-                <div className="mb-1 flex items-center justify-between text-xs text-slate-400"><span>Low Quality</span><span>High Quality</span></div>
-                <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                  <div className={`h-full rounded-full transition-all ${a.estimatedQuality >= 85 ? 'bg-emerald-500' : a.estimatedQuality >= 65 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${a.estimatedQuality}%` }} />
-                </div>
-              </div>
+          {previewUrl && (
+            <div className="flex justify-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={previewUrl} alt="Analyzed image" className="max-h-[300px] rounded-xl border border-slate-200 shadow-sm" />
             </div>
-          ))}
+          )}
 
-          {recommendations.length > 0 && (
-            <div className="rounded-xl border border-brand-200 bg-brand-50/50 p-5">
-              <h4 className="mb-3 text-sm font-semibold text-brand-800">Suggested Next Steps</h4>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[
+              { icon: <Gauge className="h-4 w-4" />, label: 'File Size', value: formatBytes(analysis.fileSize) },
+              { icon: <ImageIcon className="h-4 w-4" />, label: 'Dimensions', value: `${analysis.imgWidth}×${analysis.imgHeight}` },
+              { icon: <Layers className="h-4 w-4" />, label: 'Megapixels', value: analysis.megapixels.toFixed(2) },
+              { icon: <FileText className="h-4 w-4" />, label: 'Format', value: analysis.format },
+            ].map((s, i) => (
+              <div key={i} className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-center">
+                <span className="mx-auto mb-1 block text-slate-400">{s.icon}</span>
+                <span className="block text-sm font-bold text-slate-700">{s.value}</span>
+                <span className="block text-[10px] text-slate-400">{s.label}</span>
+              </div>
+            ))}
+          </div>
+
+          {analysis.qualityIssues.length > 0 && (
+            <div className="rounded-xl bg-amber-50 p-4">
+              <p className="mb-2 text-xs font-semibold text-amber-800">Quality Issues</p>
+              <ul className="space-y-1.5">
+                {analysis.qualityIssues.map((issue, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-amber-700">
+                    <span className="mt-1 block h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-500" />{issue}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {analysis.recommendations.length > 0 && (
+            <div>
+              <h3 className="mb-2 text-sm font-semibold text-slate-700">Recommended Tools</h3>
               <div className="space-y-2">
-                {recommendations.map((rec, i) => (
-                  <a key={i} href={`/pdf-saas/tools/${rec.slug}`}
-                    className="flex items-center gap-3 rounded-lg border border-brand-100 bg-white px-3 py-2 text-sm transition-colors hover:border-brand-300">
-                    <span className="font-medium text-brand-700">{rec.tool}</span>
-                    <ArrowRight className="h-3 w-3 text-brand-400" />
-                    <span className="text-slate-500">{rec.reason}</span>
-                  </a>
+                {analysis.recommendations.map((rec, i) => (
+                  <Link key={i} href={`/tools/${rec.tool}?ref=image-quality&action=${rec.action}`}
+                    className="block rounded-xl border border-slate-200 p-3 text-left transition-all hover:border-brand-300 hover:bg-brand-50 hover:shadow-sm">
+                    <p className="text-sm font-semibold text-slate-800">{rec.title}</p>
+                    <p className="text-xs text-slate-500">{rec.description}</p>
+                    <span className="mt-1 inline-block text-xs font-semibold text-brand-600">{rec.action} →</span>
+                  </Link>
                 ))}
               </div>
             </div>
           )}
 
-          <Button variant="outline" size="sm" onClick={reset}>Analyze More Images</Button>
+          {result && <ResultPanel items={result} onReset={reset} />}
+          {worker.error && <ErrorAlert message={worker.error} />}
+
+          <Button onClick={reset} variant="outline" className="w-full">Analyze Another Image</Button>
         </div>
       )}
     </Card>
   )
-}
-
-function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
-  return <div><p className="text-xs text-slate-400">{label}</p><p className="text-sm font-medium text-slate-700">{value}</p></div>
 }

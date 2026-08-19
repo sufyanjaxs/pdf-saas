@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { FileUploader } from './FileUploader'
 import { FileList } from './FileList'
-import { ProgressBar } from './ProgressBar'
 import { ProcessingOverlay } from './ProcessingOverlay'
 import { ResultPanel, type ResultItem } from './ResultPanel'
 import { ErrorAlert } from './ErrorAlert'
@@ -12,22 +11,22 @@ import { Card } from '@/components/ui/card'
 import { useImageWorker } from '@/hooks/useImageWorker'
 import { usePdfWorker } from '@/hooks/usePdfWorker'
 import { fileToImagePayload, resultBlobUrl } from '@/lib/client-utils'
-import { formatBytes } from '@pdf-saas/file-utils'
+import { Globe, Printer } from 'lucide-react'
 
 const ACCEPT = 'image/jpeg,image/png,image/webp'
 
-interface PhotoPreset { id: string; name: string; country: string; width: number; height: number; description: string }
+interface PhotoPreset { id: string; name: string; country: string; width: number; height: number; desc: string }
 
 const PRESETS: PhotoPreset[] = [
-  { id: 'us-passport', name: 'US Passport', country: 'USA', width: 600, height: 600, description: '2x2 in (51x51mm)' },
-  { id: 'us-visa', name: 'US Visa', country: 'USA', width: 600, height: 600, description: '2x2 in (51x51mm)' },
-  { id: 'uk-passport', name: 'UK Passport', country: 'UK', width: 420, height: 525, description: '35x45mm' },
-  { id: 'eu-id', name: 'EU ID Card', country: 'EU', width: 420, height: 525, description: '35x45mm' },
-  { id: 'canada-passport', name: 'Canada Passport', country: 'Canada', width: 420, height: 540, description: '35x45mm' },
-  { id: 'australia-passport', name: 'Australia Passport', country: 'Australia', width: 420, height: 525, description: '35x45mm' },
-  { id: 'india-passport', name: 'India Passport', country: 'India', width: 600, height: 600, description: '2x2 in (51x51mm)' },
-  { id: 'china-passport', name: 'China Passport', country: 'China', width: 390, height: 567, description: '33x48mm' },
-  { id: 'custom', name: 'Custom Size', country: '', width: 600, height: 600, description: 'Enter your own dimensions' },
+  { id: 'us-passport', name: 'US Passport', country: 'USA', width: 600, height: 600, desc: '2×2 in (51×51mm)' },
+  { id: 'us-visa', name: 'US Visa', country: 'USA', width: 600, height: 600, desc: '2×2 in (51×51mm)' },
+  { id: 'uk-passport', name: 'UK Passport', country: 'UK', width: 420, height: 525, desc: '35×45mm' },
+  { id: 'eu-id', name: 'EU ID Card', country: 'EU', width: 420, height: 525, desc: '35×45mm' },
+  { id: 'canada-passport', name: 'Canada Passport', country: 'Canada', width: 420, height: 540, desc: '35×45mm' },
+  { id: 'australia-passport', name: 'Australia', country: 'Australia', width: 420, height: 525, desc: '35×45mm' },
+  { id: 'india-passport', name: 'India Passport', country: 'India', width: 600, height: 600, desc: '2×2 in (51×51mm)' },
+  { id: 'china-passport', name: 'China Passport', country: 'China', width: 390, height: 567, desc: '33×48mm' },
+  { id: 'custom', name: 'Custom Size', country: '', width: 600, height: 600, desc: 'Your own size' },
 ]
 
 const BG_COLORS = [
@@ -39,7 +38,6 @@ const BG_COLORS = [
 
 type PaperSize = 'a4' | 'letter'
 type Orientation = 'portrait' | 'landscape'
-
 interface CropState { x: number; y: number; w: number; h: number }
 
 function calcSheetLayout(photoW: number, photoH: number, paper: PaperSize, orientation: Orientation) {
@@ -57,7 +55,7 @@ function calcSheetLayout(photoW: number, photoH: number, paper: PaperSize, orien
 
 export function PassportPhotoTool() {
   const [file, setFile] = useState<File | null>(null)
-  const [preset, setPreset] = useState('us-passport')
+  const [presetId, setPreset] = useState('us-passport')
   const [customW, setCustomW] = useState('600')
   const [customH, setCustomH] = useState('600')
   const [bgColor, setBgColor] = useState('#ffffff')
@@ -70,9 +68,9 @@ export function PassportPhotoTool() {
   const worker = useImageWorker()
   const pdfWorker = usePdfWorker()
 
-  const currentPreset = PRESETS.find((p) => p.id === preset)!
-  const outW = preset === 'custom' ? parseInt(customW, 10) || 600 : currentPreset.width
-  const outH = preset === 'custom' ? parseInt(customH, 10) || 600 : currentPreset.height
+  const currentPreset = PRESETS.find((p) => p.id === presetId)!
+  const outW = presetId === 'custom' ? parseInt(customW, 10) || 600 : currentPreset.width
+  const outH = presetId === 'custom' ? parseInt(customH, 10) || 600 : currentPreset.height
 
   const onFiles = useCallback((files: File[]) => { setFile(files[0]); setResult(null); setCrop(null); setSheetPreview(null); setSheetBlob(null) }, [])
 
@@ -82,39 +80,29 @@ export function PassportPhotoTool() {
     const payload = await fileToImagePayload(file)
     const [cropped] = await worker.run('crop', { files: [payload], opts: { x: crop.x, y: crop.y, width: crop.w, height: crop.h } })
     const [resized] = await worker.run('resize', { files: [{ bytes: cropped.bytes, mime: cropped.mime, name: cropped.name }], opts: { width: outW, height: outH, fit: 'cover' } })
-    const [final] = await worker.run('fill-background', { files: [{ bytes: resized.bytes, mime: resized.mime, name: resized.name }], opts: { color: bgColor } })
-
-    const photoUrl = resultBlobUrl(final.mime, final.bytes)
-    setResult([{ name: `passport-photo-${outW}x${outH}.png`, url: photoUrl, size: final.size, detail: `${outW}x${outH}px | ${currentPreset.name}` }])
+    const [final_] = await worker.run('fill-background', { files: [{ bytes: resized.bytes, mime: resized.mime, name: resized.name }], opts: { color: bgColor } })
+    const photoUrl = resultBlobUrl(final_.mime, final_.bytes)
+    setResult([{ name: `passport-photo-${outW}x${outH}.png`, url: photoUrl, size: final_.size, detail: `${outW}×${outH}px | ${currentPreset.name}` }])
 
     const { paperW, paperH, cols, rows, margin, gap } = calcSheetLayout(outW, outH, paperSize, orientation)
     const canvas = new OffscreenCanvas(paperW, paperH)
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
+    const ctx = canvas.getContext('2d')!
     ctx.fillStyle = '#ffffff'
     ctx.fillRect(0, 0, paperW, paperH)
-
     const img = new Image()
     img.crossOrigin = 'anonymous'
-    await new Promise<void>((resolve) => { img.onload = () => resolve(); img.src = photoUrl })
+    await new Promise<void>((r) => { img.onload = () => r(); img.src = photoUrl })
     await new Promise<void>((r) => setTimeout(r, 50))
-
     const startX = (paperW - (cols * outW + (cols - 1) * gap)) / 2
     const startY = (paperH - (rows * outH + (rows - 1) * gap)) / 2
-
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < cols; col++) {
-        const x = startX + col * (outW + gap)
-        const y = startY + row * (outH + gap)
+        const x = startX + col * (outW + gap), y = startY + row * (outH + gap)
         ctx.drawImage(img, x, y, outW, outH)
-        ctx.strokeStyle = '#e2e8f0'
-        ctx.lineWidth = 1
-        ctx.setLineDash([4, 4])
-        ctx.strokeRect(x - 2, y - 2, outW + 4, outH + 4)
-        ctx.setLineDash([])
+        ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 1; ctx.setLineDash([4, 4])
+        ctx.strokeRect(x - 2, y - 2, outW + 4, outH + 4); ctx.setLineDash([])
       }
     }
-
     const sheetBlobOut = await canvas.convertToBlob({ type: 'image/png', quality: 1 })
     setSheetBlob(sheetBlobOut)
     setSheetPreview(URL.createObjectURL(sheetBlobOut))
@@ -122,49 +110,42 @@ export function PassportPhotoTool() {
 
   const downloadSheetImage = useCallback(() => {
     if (!sheetPreview) return
-    const a = document.createElement('a')
-    a.href = sheetPreview
-    a.download = `passport-sheet-${paperSize}-${orientation}.png`
-    a.click()
+    const a = document.createElement('a'); a.href = sheetPreview; a.download = `passport-sheet-${paperSize}-${orientation}.png`; a.click()
   }, [sheetPreview, paperSize, orientation])
 
   const downloadSheetPdf = useCallback(async () => {
     if (!sheetBlob) return
     const arr = new Uint8Array(await sheetBlob.arrayBuffer())
-    const base64 = btoa(String.fromCharCode(...arr))
     const res = await pdfWorker.run('images-to-pdf', { files: [arr], mimes: ['image/png'] })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(new Blob([res.bytes as BlobPart], { type: 'application/pdf' }))
-    a.download = `passport-sheet-${paperSize}-${orientation}.pdf`
-    a.click()
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([res.bytes as BlobPart], { type: 'application/pdf' })); a.download = `passport-sheet-${paperSize}-${orientation}.pdf`; a.click()
   }, [sheetBlob, pdfWorker, paperSize, orientation])
 
   const reset = useCallback(() => { setFile(null); setResult(null); setCrop(null); setSheetPreview(null); setSheetBlob(null) }, [])
-
   const layout = calcSheetLayout(outW, outH, paperSize, orientation)
 
   return (
     <Card className="relative">
       {!file ? (
-        <FileUploader accept={ACCEPT} maxSizeMB={50} onFiles={onFiles} hint="Upload a front-facing photo with good lighting" />
+        <FileUploader accept={ACCEPT} maxSizeMB={50} multiple={false} onFiles={onFiles} hint="Upload a front-facing photo with good lighting" />
       ) : (
         <div className="space-y-6">
           <FileList files={[file]} onRemove={reset} />
 
+          {/* Country presets */}
           <div>
-            <h3 className="mb-2 text-sm font-semibold text-slate-700">Photo Size Preset</h3>
+            <h3 className="mb-2 text-sm font-semibold text-slate-700">Country / Document</h3>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {PRESETS.map((p) => (
                 <button key={p.id} type="button" onClick={() => setPreset(p.id)}
-                  className={`rounded-lg border-2 px-3 py-2 text-left transition-colors ${
-                    preset === p.id ? 'border-brand-600 bg-brand-50' : 'border-slate-200 hover:border-brand-300'
+                  className={`rounded-xl border-2 px-3 py-2.5 text-left transition-all ${
+                    presetId === p.id ? 'border-brand-600 bg-brand-50 shadow-sm' : 'border-slate-200 hover:border-brand-300'
                   }`}>
-                  <span className={`block text-sm font-medium ${preset === p.id ? 'text-brand-700' : 'text-slate-700'}`}>{p.name}</span>
-                  <span className="block text-xs text-slate-400">{p.description}</span>
+                  <span className={`block text-sm font-medium ${presetId === p.id ? 'text-brand-700' : 'text-slate-700'}`}>{p.name}</span>
+                  <span className="block text-xs text-slate-400">{p.desc}</span>
                 </button>
               ))}
             </div>
-            {preset === 'custom' && (
+            {presetId === 'custom' && (
               <div className="mt-3 flex items-center gap-3">
                 <div><label className="mb-1 block text-xs font-medium text-slate-500">Width (px)</label>
                   <input type="number" min={50} max={3000} value={customW} onChange={(e) => setCustomW(e.target.value)} className="w-24 rounded-lg border border-slate-300 px-3 py-1.5 text-sm outline-none focus:border-brand-500" /></div>
@@ -174,9 +155,10 @@ export function PassportPhotoTool() {
             )}
           </div>
 
+          {/* Background */}
           <div>
             <h3 className="mb-2 text-sm font-semibold text-slate-700">Background Color</h3>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {BG_COLORS.map((bg) => (
                 <button key={bg.id} type="button" onClick={() => setBgColor(bg.color)}
                   className={`flex items-center gap-2 rounded-lg border-2 px-3 py-2 text-sm transition-colors ${
@@ -189,6 +171,7 @@ export function PassportPhotoTool() {
             </div>
           </div>
 
+          {/* Print settings */}
           <div>
             <h3 className="mb-2 text-sm font-semibold text-slate-700">Print Settings</h3>
             <div className="flex flex-wrap gap-4">
@@ -215,20 +198,25 @@ export function PassportPhotoTool() {
                 </div>
               </div>
             </div>
-            <p className="mt-2 text-xs text-slate-400">{layout.cols} x {layout.rows} = {layout.cols * layout.rows} photos per sheet</p>
+            <p className="mt-2 text-xs text-slate-400">
+              <Printer className="mr-1 inline h-3 w-3" />
+              {layout.cols}×{layout.rows} = {layout.cols * layout.rows} photos per sheet
+            </p>
           </div>
 
+          {/* Crop preview */}
           <PassportCropPreview file={file} aspectRatio={outW / outH} onCrop={setCrop} />
 
+          {/* Result + sheet preview */}
           {result && (
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <h4 className="mb-2 text-sm font-semibold text-slate-700">Output</h4>
+              <h4 className="mb-3 text-sm font-semibold text-slate-700">Result</h4>
               <div className="flex flex-wrap gap-4">
                 {result.map((item, i) => (
                   <div key={i} className="text-center">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={item.url} alt="Passport photo" className="rounded-lg border border-slate-200 shadow-sm" style={{ maxWidth: 200 }} />
-                    <p className="mt-1 text-xs text-slate-400">{outW}x{outH}px</p>
+                    <p className="mt-1 text-xs text-slate-400">{outW}×{outH}px</p>
                   </div>
                 ))}
               </div>
@@ -247,14 +235,14 @@ export function PassportPhotoTool() {
           {pdfWorker.error && <ErrorAlert message={pdfWorker.error} />}
 
           <div className="flex flex-wrap items-center gap-3">
-            <Button size="lg" loading={worker.running} disabled={!crop} onClick={() => void processPhoto()}>Create Passport Photo</Button>
+            <Button size="lg" loading={worker.running} disabled={!crop} onClick={() => void processPhoto()}>
+              <Globe className="mr-1 h-4 w-4" /> Create Passport Photo
+            </Button>
             {sheetPreview && <Button variant="outline" onClick={downloadSheetImage}>Download Sheet (PNG)</Button>}
             {sheetBlob && <Button variant="outline" onClick={() => void downloadSheetPdf()}>Download Sheet (PDF)</Button>}
             {worker.running && <Button variant="ghost" onClick={worker.cancel}>Cancel</Button>}
           </div>
-          <ProgressBar value={worker.progress} label={worker.label} />
           {worker.running && <ProcessingOverlay label={worker.label || 'Creating passport photo...'} progress={worker.progress} onCancel={worker.cancel} />}
-
           {result && <ResultPanel items={result} onReset={reset} />}
         </div>
       )}
@@ -275,7 +263,11 @@ function PassportCropPreview({ file, aspectRatio, onCrop }: { file: File; aspect
   const rectOf = () => { const r = wrapRef.current?.getBoundingClientRect(); return r ?? { left: 0, top: 0, width: 0, height: 0 } }
   const clamp = (v: number, mn: number, mx: number) => Math.max(mn, Math.min(mx, v))
 
-  const start = (e: React.PointerEvent) => { e.preventDefault(); (e.target as HTMLElement).setPointerCapture(e.pointerId); dragging.current = true; const r = rectOf(); const x = e.clientX - r.left, y = e.clientY - r.top; startPos.current = { x, y }; setSel({ x, y, w: 0, h: 0 }) }
+  const start = (e: React.PointerEvent) => {
+    e.preventDefault(); (e.target as HTMLElement).setPointerCapture(e.pointerId); dragging.current = true
+    const r = rectOf(); const x = e.clientX - r.left, y = e.clientY - r.top
+    startPos.current = { x, y }; setSel({ x, y, w: 0, h: 0 })
+  }
   const move = (e: React.PointerEvent) => {
     if (!dragging.current) return; e.preventDefault()
     const r = rectOf(); const cx = clamp(e.clientX - r.left, 0, r.width); const cy = clamp(e.clientY - r.top, 0, r.height)
