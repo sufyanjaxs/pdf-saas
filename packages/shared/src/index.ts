@@ -197,6 +197,16 @@ export interface CompressAdvancedPayload {
   };
 }
 
+export interface RotateImagePayload {
+  files: ImageBlobPayload[];
+  opts: { degrees: number };
+}
+
+export interface FlipImagePayload {
+  files: ImageBlobPayload[];
+  opts: { direction: "horizontal" | "vertical" };
+}
+
 export interface AnalyzePayload {
   files: ImageBlobPayload[];
 }

@@ -57,6 +57,12 @@ const loaders: Record<string, () => Promise<{ default: ComponentType }>> = {
   'pdf-to-excel': () => import('@/components/tools/PdfToExcelTool').then((m) => ({ default: m.PdfToExcelTool })),
   'pdf-to-powerpoint': () => import('@/components/tools/PdfToPowerPointTool').then((m) => ({ default: m.PdfToPowerPointTool })),
   'word-to-pdf': () => import('@/components/tools/WordToPdfTool').then((m) => ({ default: m.WordToPdfTool })),
+  'image-rotate': () => import('@/components/tools/ImageRotateTool').then((m) => ({ default: m.ImageRotateTool })),
+  'image-flip': () => import('@/components/tools/ImageFlipTool').then((m) => ({ default: m.ImageFlipTool })),
+  'image-grayscale': () => import('@/components/tools/ImageGrayscaleTool').then((m) => ({ default: m.ImageGrayscaleTool })),
+  'image-brightness': () => import('@/components/tools/ImageBrightnessTool').then((m) => ({ default: m.ImageBrightnessTool })),
+  'image-blur': () => import('@/components/tools/ImageBlurTool').then((m) => ({ default: m.ImageBlurTool })),
+  'image-sharpen': () => import('@/components/tools/ImageSharpenTool').then((m) => ({ default: m.ImageSharpenTool })),
 }
 
 export const toolRegistry: RegistryEntry[] = toolDefinitions.map((def) => {

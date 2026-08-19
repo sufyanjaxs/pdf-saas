@@ -13,7 +13,7 @@ export function ToolLayout({
   children: ReactNode
 }) {
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-8">
+    <div className="mx-auto w-full max-w-7xl px-4 py-8">
       <Link
         href="/"
         className="mb-6 inline-flex items-center gap-1.5 text-sm text-slate-500 transition-colors hover:text-brand-600"
@@ -22,7 +22,7 @@ export function ToolLayout({
         All tools
       </Link>
 
-      <div className="mb-8">
+      <div className="mb-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-sm font-medium text-brand-600">{tool.category} tool</p>

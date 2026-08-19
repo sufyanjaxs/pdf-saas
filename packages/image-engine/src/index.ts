@@ -353,6 +353,36 @@ export async function fillBackground(blob: Blob, color: string): Promise<Blob> {
  * Uses binary search over quality values to hit a target size.
  * Preserves format awareness and transparency.
  */
+export async function rotateImage(blob: Blob, degrees: number): Promise<Blob> {
+  const img = await createImageBitmap(blob);
+  const rad = (degrees * Math.PI) / 180;
+  const cos = Math.abs(Math.cos(rad));
+  const sin = Math.abs(Math.sin(rad));
+  const w = Math.round(img.width * cos + img.height * sin);
+  const h = Math.round(img.width * sin + img.height * cos);
+  const canvas = new OffscreenCanvas(w, h);
+  const ctx = canvas.getContext("2d")!;
+  ctx.translate(w / 2, h / 2);
+  ctx.rotate(rad);
+  ctx.drawImage(img, -img.width / 2, -img.height / 2);
+  return canvas.convertToBlob({ type: blob.type || "image/png" });
+}
+
+export async function flipImage(blob: Blob, direction: "horizontal" | "vertical"): Promise<Blob> {
+  const img = await createImageBitmap(blob);
+  const canvas = new OffscreenCanvas(img.width, img.height);
+  const ctx = canvas.getContext("2d")!;
+  if (direction === "horizontal") {
+    ctx.translate(img.width, 0);
+    ctx.scale(-1, 1);
+  } else {
+    ctx.translate(0, img.height);
+    ctx.scale(1, -1);
+  }
+  ctx.drawImage(img, 0, 0);
+  return canvas.convertToBlob({ type: blob.type || "image/png" });
+}
+
 export async function compressImageAdvanced(
   blob: Blob,
   opts: CompressAdvancedOptions

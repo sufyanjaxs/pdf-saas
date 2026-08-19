@@ -4,6 +4,7 @@ import {
   Trash2,
   Scissors,
   RotateCw,
+  RotateCcw,
   Images,
   FileImage,
   Archive,
@@ -11,6 +12,7 @@ import {
   Ruler,
   Crop,
   Repeat,
+  FlipHorizontal,
   FileText,
   FileSpreadsheet,
   Presentation,
@@ -27,6 +29,12 @@ import {
   Eraser,
   ScanSearch,
   Maximize,
+  Palette,
+  Sun,
+  Contrast,
+  Droplets,
+  Sparkles,
+  Paintbrush,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -36,6 +44,8 @@ export type ToolIconName =
   | 'trash'
   | 'scissors'
   | 'rotate'
+  | 'rotate-ccw'
+  | 'flip'
   | 'image-to-pdf'
   | 'pdf-to-image'
   | 'archive'
@@ -59,6 +69,12 @@ export type ToolIconName =
   | 'eraser'
   | 'scan-search'
   | 'maximize'
+  | 'palette'
+  | 'sun'
+  | 'contrast'
+  | 'droplets'
+  | 'sparkles'
+  | 'paintbrush'
 
 const icons: Record<ToolIconName, LucideIcon> = {
   'file-split': FileStack,
@@ -66,6 +82,8 @@ const icons: Record<ToolIconName, LucideIcon> = {
   trash: Trash2,
   scissors: Scissors,
   rotate: RotateCw,
+  'rotate-ccw': RotateCcw,
+  flip: FlipHorizontal,
   'image-to-pdf': Images,
   'pdf-to-image': FileImage,
   archive: Archive,
@@ -89,6 +107,12 @@ const icons: Record<ToolIconName, LucideIcon> = {
   eraser: Eraser,
   'scan-search': ScanSearch,
   maximize: Maximize,
+  palette: Palette,
+  sun: Sun,
+  contrast: Contrast,
+  droplets: Droplets,
+  sparkles: Sparkles,
+  paintbrush: Paintbrush,
 }
 
 export function ToolIcon({ name, className }: { name: ToolIconName; className?: string }) {
