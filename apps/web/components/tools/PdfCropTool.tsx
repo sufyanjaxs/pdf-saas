@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { FileUploader } from './FileUploader'
@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { ToolWorkspace, ControlSection } from './ToolWorkspace'
 import { usePdfWorker } from '@/hooks/usePdfWorker'
 import { usePdfPages } from '@/hooks/usePdfPages'
-import { defaultOutputName, resultBlobUrl } from '@/lib/client-utils'
+import { defaultOutputName, resultBlobUrl, releaseResultUrls } from '@/lib/client-utils'
 import { Crop } from 'lucide-react'
 
 interface Margins {
@@ -39,7 +39,7 @@ export function PdfCropTool() {
   const onFiles = useCallback(async (files: File[]) => {
     const f = files[0]
     setFile(f)
-    setResult(null)
+    setResult(null); releaseResultUrls()
     await load(f)
   }, [load])
 
@@ -112,7 +112,7 @@ export function PdfCropTool() {
   const reset = useCallback(() => {
     setFile(null)
     setMargins({ top: 5, right: 5, bottom: 5, left: 5 })
-    setResult(null)
+    setResult(null); releaseResultUrls()
   }, [])
 
   const fields: Array<{ key: keyof Margins; label: string }> = [
@@ -184,7 +184,7 @@ export function PdfCropTool() {
             {worker.running && <Button variant="ghost" onClick={worker.cancel}>Cancel</Button>}
           </div>
           <ProgressBar value={worker.progress} label={worker.label} />
-          {worker.running && <ProcessingOverlay label={worker.label || 'Cropping PDF…'} progress={worker.progress} onCancel={worker.cancel} />}
+          {worker.running && <ProcessingOverlay label={worker.label || 'Cropping PDFâ€¦'} progress={worker.progress} onCancel={worker.cancel} />}
         </>
       }
     />

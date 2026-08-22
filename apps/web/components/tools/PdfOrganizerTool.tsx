@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useCallback, useState } from 'react'
 import { FileUploader } from './FileUploader'
@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { ToolWorkspace, ControlSection } from './ToolWorkspace'
 import { usePdfWorker } from '@/hooks/usePdfWorker'
 import { usePdfPages } from '@/hooks/usePdfPages'
-import { defaultOutputName, resultBlobUrl } from '@/lib/client-utils'
+import { defaultOutputName, resultBlobUrl, releaseResultUrls } from '@/lib/client-utils'
 import { GripVertical, ArrowUp, ArrowDown, RotateCcw } from 'lucide-react'
 import { parseRanges } from '@pdf-saas/pdf-engine'
 
@@ -27,7 +27,7 @@ export function PdfOrganizerTool() {
   const onFiles = useCallback(async (files: File[]) => {
     const f = files[0]
     setFile(f)
-    setResult(null)
+    setResult(null); releaseResultUrls()
     await load(f)
   }, [load])
 
@@ -99,7 +99,7 @@ export function PdfOrganizerTool() {
     setPageOrder([])
     setTextInput('')
     setUseTextMode(false)
-    setResult(null)
+    setResult(null); releaseResultUrls()
   }, [])
 
   if (!file) {
@@ -204,7 +204,7 @@ export function PdfOrganizerTool() {
             {worker.running && <Button variant="ghost" onClick={worker.cancel}>Cancel</Button>}
           </div>
           <ProgressBar value={worker.progress} label={worker.label} />
-          {worker.running && <ProcessingOverlay label={worker.label || 'Organizing pages…'} progress={worker.progress} onCancel={worker.cancel} />}
+          {worker.running && <ProcessingOverlay label={worker.label || 'Organizing pagesâ€¦'} progress={worker.progress} onCancel={worker.cancel} />}
         </>
       }
     />

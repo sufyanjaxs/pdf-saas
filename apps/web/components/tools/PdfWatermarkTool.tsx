@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { FileUploader } from './FileUploader'
@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { ToolWorkspace, ControlSection } from './ToolWorkspace'
 import { usePdfWorker } from '@/hooks/usePdfWorker'
 import { usePdfPages } from '@/hooks/usePdfPages'
-import { defaultOutputName, resultBlobUrl } from '@/lib/client-utils'
+import { defaultOutputName, resultBlobUrl, releaseResultUrls } from '@/lib/client-utils'
 
 export function PdfWatermarkTool() {
   const [file, setFile] = useState<File | null>(null)
@@ -27,7 +27,7 @@ export function PdfWatermarkTool() {
   const onFiles = useCallback(async (files: File[]) => {
     const f = files[0]
     setFile(f)
-    setResult(null)
+    setResult(null); releaseResultUrls()
     await load(f)
   }, [load])
 
@@ -64,7 +64,7 @@ export function PdfWatermarkTool() {
 
   const run = useCallback(async () => {
     if (!file || !text.trim()) return
-    setResult(null)
+    setResult(null); releaseResultUrls()
     const bytes = await file.arrayBuffer()
     const res = await worker.run('watermark', {
       bytes: new Uint8Array(bytes),
@@ -87,7 +87,7 @@ export function PdfWatermarkTool() {
     setOpacity(25)
     setFontSize(48)
     setRotation(-45)
-    setResult(null)
+    setResult(null); releaseResultUrls()
   }, [])
 
   return (
@@ -144,7 +144,7 @@ export function PdfWatermarkTool() {
               <div>
                 <div className="mb-1 flex items-center justify-between">
                   <label className="text-xs font-medium text-slate-500">Rotation</label>
-                  <span className="text-xs font-semibold text-brand-600">{rotation}°</span>
+                  <span className="text-xs font-semibold text-brand-600">{rotation}Â°</span>
                 </div>
                 <input
                   type="range" min={-90} max={90} value={rotation}

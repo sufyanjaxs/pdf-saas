@@ -182,6 +182,23 @@ export async function analyzeImage(blob: Blob): Promise<ImageAnalysis> {
   };
 }
 
+/**
+ * Geometry for 'cover' fit: scale the source until it fully covers the
+ * destination box (aspect preserved), then center it so the canvas clips
+ * the overflow equally on both axes. Exported for regression tests.
+ */
+export function coverGeometry(
+  srcW: number,
+  srcH: number,
+  dstW: number,
+  dstH: number,
+): { dx: number; dy: number; drawW: number; drawH: number } {
+  const scale = Math.max(dstW / srcW, dstH / srcH);
+  const drawW = srcW * scale;
+  const drawH = srcH * scale;
+  return { dx: (dstW - drawW) / 2, dy: (dstH - drawH) / 2, drawW, drawH };
+}
+
 export async function resizeImage(blob: Blob, opts: ResizeOptions): Promise<Blob> {
   const bitmap = await loadBitmap(blob);
   const srcW = bitmap.width;
@@ -197,6 +214,8 @@ export async function resizeImage(blob: Blob, opts: ResizeOptions): Promise<Blob
         opts.height / srcH
       );
       if (opts.fit === 'cover') {
+        // Scale to fill the target box, then center-crop the overflow so the
+        // aspect ratio is preserved (previously this stretched the image).
         w = opts.width;
         h = opts.height;
       } else {
@@ -221,7 +240,14 @@ export async function resizeImage(blob: Blob, opts: ResizeOptions): Promise<Blob
   }
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(bitmap, 0, 0, w, h);
+
+  if (opts.fit === 'cover' && opts.width && opts.height) {
+    // Draw at cover scale, centered, letting the canvas clip the excess.
+    const g = coverGeometry(srcW, srcH, w, h);
+    ctx.drawImage(bitmap, g.dx, g.dy, g.drawW, g.drawH);
+  } else {
+    ctx.drawImage(bitmap, 0, 0, w, h);
+  }
   bitmap.close();
 
   const format: ImageFormat = blob.type === 'image/png' || blob.type === 'image/webp' ? blob.type as ImageFormat : 'image/jpeg';

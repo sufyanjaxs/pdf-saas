@@ -85,7 +85,7 @@ export function useWorker<TResult = unknown>(
         return Promise.reject(new Error('An operation is already running. Cancel it first.'))
       }
 
-      return new Promise<TResult>((resolve, reject) => {
+      const promise = new Promise<TResult>((resolve, reject) => {
         const id = uid('w_')
         currentIdRef.current = id
         resolveRef.current = resolve
@@ -97,7 +97,13 @@ export function useWorker<TResult = unknown>(
 
         const request: WorkerRequest = { id, signal: 'start', operation, payload }
         worker.postMessage(request)
-      }).finally(() => {
+      })
+      // Cancellation and worker errors reject this promise; tools drive their
+      // UI from hook state rather than the promise, so mark it handled here to
+      // avoid noisy unhandled-rejection reports while callers awaiting it
+      // still observe the rejection.
+      promise.catch(() => {})
+      return promise.finally(() => {
         setRunning(false)
         setTimeout(() => setProgress(null), 300)
       })
@@ -109,6 +115,20 @@ export function useWorker<TResult = unknown>(
     const id = currentIdRef.current
     if (!id || !workerRef.current) return
     workerRef.current.postMessage({ id, signal: 'cancel' } as unknown as WorkerRequest)
+    // Settle the pending promise immediately so `running` flips back to false
+    // and the UI unblocks. The worker suppresses any late result/error for
+    // this id, and batch loops stop between items.
+    currentIdRef.current = null
+    const reject = rejectRef.current
+    resolveRef.current = null
+    rejectRef.current = null
+    setProgress(null)
+    setLabel('')
+    if (reject) {
+      const err = new Error('Cancelled')
+      err.name = 'AbortError'
+      reject(err)
+    }
   }, [])
 
   const resetError = useCallback(() => setError(null), [])

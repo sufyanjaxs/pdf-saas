@@ -12,6 +12,7 @@ import {
   PDFRawStream,
   PDFName,
   PDFNumber,
+  PDFArray,
   StandardFonts,
   degrees,
   rgb,
@@ -424,28 +425,51 @@ export async function compressPdf(input: CompressInput): Promise<CompressOutput>
 }
 
 /**
+ * True when a stream's /Filter entry (a name or an array of names) includes
+ * DCTDecode, i.e. the stream is JPEG-encoded.
+ *
+ * NOTE: PDFName.asString() returns the ENCODED name including the leading
+ * slash ('/DCTDecode'). Comparing against 'DCTDecode' never matches — this was
+ * a real bug that silently disabled Strong/Maximum compression. PDFName.of()
+ * returns pooled instances, so identity comparison also works; we use both
+ * checks for clarity. Exported for regression tests.
+ */
+export function filterIsJpeg(filter: unknown): boolean {
+  if (filter instanceof PDFName) {
+    return filter === PDFName.of('DCTDecode') || filter.asString() === '/DCTDecode';
+  }
+  if (filter instanceof PDFArray) {
+    for (let i = 0; i < filter.size(); i++) {
+      const f = filter.get(i);
+      if (f instanceof PDFName && (f === PDFName.of('DCTDecode') || f.asString() === '/DCTDecode')) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
  * Walks every indirect object; any DCTDecode (JPEG) image stream that is
  * lossy-recompressible gets re-encoded at the target quality and swapped in.
  * Skipped when the re-encode is not smaller, or when streams are too small
  * to avoid destroying tiny logos/icons.
+ *
+ * `reencode` is injectable so the walk/detect/swap logic can be regression-
+ * tested in Node without canvas APIs.
  */
-async function recompressJpegs(doc: PDFDocument, quality: number): Promise<void> {
+export async function recompressJpegs(
+  doc: PDFDocument,
+  quality: number,
+  reencode?: (jpegBytes: Uint8Array, width: number, height: number, quality: number) => Promise<Uint8Array | null>,
+): Promise<void> {
   const context = (doc as any).context;
   if (!context || typeof context.enumerateIndirectObjects !== 'function') return;
 
   for (const [ref, obj] of context.enumerateIndirectObjects()) {
     if (!(obj instanceof PDFRawStream)) continue;
     const dict: PDFDict = obj.dict;
-    const filter = dict.get(PDFName.of('Filter'));
-
-    let isJpeg = false;
-    if (filter instanceof PDFName && filter.asString() === 'DCTDecode') isJpeg = true;
-    else if (Array.isArray(filter)) {
-      isJpeg = (filter as unknown as PDFName[]).some(
-        (f) => f instanceof PDFName && f.asString() === 'DCTDecode'
-      );
-    }
-    if (!isJpeg) continue;
+    if (!filterIsJpeg(dict.get(PDFName.of('Filter')))) continue;
 
     const width = dict.get(PDFName.of('Width'));
     const height = dict.get(PDFName.of('Height'));
@@ -456,18 +480,14 @@ async function recompressJpegs(doc: PDFDocument, quality: number): Promise<void>
     if (!raw || raw.length < 64) continue;
 
     try {
-      const bitmap = await createImageBitmap(new Blob([raw as unknown as BlobPart], { type: 'image/jpeg' }));
-      const canvas = new OffscreenCanvas(width.asNumber(), height.asNumber());
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        bitmap.close();
-        continue;
+      let newBytes: Uint8Array | null;
+      if (reencode) {
+        newBytes = await reencode(raw, width.asNumber(), height.asNumber(), quality);
+      } else {
+        if (!isBrowser) continue;
+        newBytes = await reencodeInBrowser(raw, width.asNumber(), height.asNumber(), quality);
       }
-      ctx.drawImage(bitmap, 0, 0, width.asNumber(), height.asNumber());
-      bitmap.close();
-      const blob = await canvas.convertToBlob({ type: 'image/jpeg', quality });
-      const newBytes = new Uint8Array(await blob.arrayBuffer());
-      if (newBytes.length >= raw.length) continue;
+      if (!newBytes || newBytes.length >= raw.length) continue;
 
       const newDict = dict.clone();
       newDict.set(PDFName.of('Length'), PDFNumber.of(newBytes.length));
@@ -476,6 +496,25 @@ async function recompressJpegs(doc: PDFDocument, quality: number): Promise<void>
       // Some JPEGs fail to decode in-browser; leave them untouched.
     }
   }
+}
+
+async function reencodeInBrowser(
+  raw: Uint8Array,
+  width: number,
+  height: number,
+  quality: number,
+): Promise<Uint8Array | null> {
+  const bitmap = await createImageBitmap(new Blob([raw as unknown as BlobPart], { type: 'image/jpeg' }));
+  const canvas = new OffscreenCanvas(width, height);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    bitmap.close();
+    return null;
+  }
+  ctx.drawImage(bitmap, 0, 0, width, height);
+  bitmap.close();
+  const blob = await canvas.convertToBlob({ type: 'image/jpeg', quality });
+  return new Uint8Array(await blob.arrayBuffer());
 }
 
 /* ------------------------------------------------------------------ */

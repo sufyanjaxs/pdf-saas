@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { FileUploader } from './FileUploader'
@@ -9,7 +9,7 @@ import { ErrorAlert } from './ErrorAlert'
 import { Button } from '@/components/ui/button'
 import { ToolWorkspace, ControlSection, InfoBar, StatBlock } from './ToolWorkspace'
 import { useImageWorker } from '@/hooks/useImageWorker'
-import { fileToImagePayload, resultBlobUrl } from '@/lib/client-utils'
+import { fileToImagePayload, resultBlobUrl, releaseResultUrls } from '@/lib/client-utils'
 import { formatBytes } from '@pdf-saas/file-utils'
 import { ArrowRight, Lock, Unlock, ImageIcon } from 'lucide-react'
 
@@ -27,18 +27,18 @@ interface ResizePreset {
 
 const PRESETS: ResizePreset[] = [
   { id: 'original', label: 'Original', width: 0, height: 0, desc: 'Keep original', category: 'size' },
-  { id: 'small', label: 'Small', width: 640, height: 480, desc: '640×480', category: 'size' },
-  { id: 'medium', label: 'Medium', width: 1280, height: 720, desc: '1280×720', category: 'size' },
-  { id: 'large', label: 'Large', width: 1920, height: 1080, desc: '1920×1080', category: 'size' },
-  { id: 'web', label: 'Web', width: 1200, height: 800, desc: '1200×800', category: 'size' },
-  { id: 'email', label: 'Email', width: 600, height: 400, desc: '600×400', category: 'size' },
-  { id: 'ig-square', label: 'Instagram Square', width: 1080, height: 1080, desc: 'Feed post', category: 'platform', emoji: '📸' },
-  { id: 'ig-portrait', label: 'Instagram Portrait', width: 1080, height: 1350, desc: '4:5 feed', category: 'platform', emoji: '📱' },
-  { id: 'ig-story', label: 'Instagram Story', width: 1080, height: 1920, desc: '9:16 vertical', category: 'platform', emoji: '✨' },
-  { id: 'fb-post', label: 'Facebook Post', width: 1200, height: 630, desc: 'Link preview', category: 'platform', emoji: '👥' },
-  { id: 'yt-thumb', label: 'YouTube Thumbnail', width: 1280, height: 720, desc: '16:9 thumbnail', category: 'platform', emoji: '🎬' },
-  { id: 'linkedin', label: 'LinkedIn', width: 1200, height: 627, desc: 'Share image', category: 'platform', emoji: '💼' },
-  { id: 'tiktok', label: 'TikTok', width: 1080, height: 1920, desc: '9:16 vertical', category: 'platform', emoji: '🎵' },
+  { id: 'small', label: 'Small', width: 640, height: 480, desc: '640Ã—480', category: 'size' },
+  { id: 'medium', label: 'Medium', width: 1280, height: 720, desc: '1280Ã—720', category: 'size' },
+  { id: 'large', label: 'Large', width: 1920, height: 1080, desc: '1920Ã—1080', category: 'size' },
+  { id: 'web', label: 'Web', width: 1200, height: 800, desc: '1200Ã—800', category: 'size' },
+  { id: 'email', label: 'Email', width: 600, height: 400, desc: '600Ã—400', category: 'size' },
+  { id: 'ig-square', label: 'Instagram Square', width: 1080, height: 1080, desc: 'Feed post', category: 'platform', emoji: 'ðŸ“¸' },
+  { id: 'ig-portrait', label: 'Instagram Portrait', width: 1080, height: 1350, desc: '4:5 feed', category: 'platform', emoji: 'ðŸ“±' },
+  { id: 'ig-story', label: 'Instagram Story', width: 1080, height: 1920, desc: '9:16 vertical', category: 'platform', emoji: 'âœ¨' },
+  { id: 'fb-post', label: 'Facebook Post', width: 1200, height: 630, desc: 'Link preview', category: 'platform', emoji: 'ðŸ‘¥' },
+  { id: 'yt-thumb', label: 'YouTube Thumbnail', width: 1280, height: 720, desc: '16:9 thumbnail', category: 'platform', emoji: 'ðŸŽ¬' },
+  { id: 'linkedin', label: 'LinkedIn', width: 1200, height: 627, desc: 'Share image', category: 'platform', emoji: 'ðŸ’¼' },
+  { id: 'tiktok', label: 'TikTok', width: 1080, height: 1920, desc: '9:16 vertical', category: 'platform', emoji: 'ðŸŽµ' },
   { id: 'passport', label: 'Passport', width: 600, height: 600, desc: '1:1 square', category: 'document' },
   { id: 'custom', label: 'Custom', width: 0, height: 0, desc: 'Your size', category: 'size' },
 ]
@@ -57,7 +57,7 @@ export function ImageResizerTool() {
 
   const onFiles = useCallback(async (incoming: File[]) => {
     setFiles(incoming)
-    setResult(null)
+    setResult(null); releaseResultUrls()
     if (incoming.length > 0) {
       const f = incoming[0]
       setOrigSize(f.size)
@@ -99,7 +99,7 @@ export function ImageResizerTool() {
 
   const run = useCallback(async () => {
     if (files.length === 0 || !outW || !outH) return
-    setResult(null)
+    setResult(null); releaseResultUrls()
     const payloads = await Promise.all(files.map((f) => fileToImagePayload(f)))
     const res = await worker.run('resize', {
       files: payloads,
@@ -107,12 +107,12 @@ export function ImageResizerTool() {
     })
     const items: ResultItem[] = res.map((r: any) => ({
       name: r.name, url: resultBlobUrl(r.mime, r.bytes), size: r.size,
-      detail: `${r.width}×${r.height} | ${currentPreset.label}`,
+      detail: `${r.width}Ã—${r.height} | ${currentPreset.label}`,
     }))
     setResult(items)
   }, [files, outW, outH, keepRatio, currentPreset, worker])
 
-  const reset = useCallback(() => { setFiles([]); setResult(null); setOrigDims(null); setOrigSize(0) }, [])
+  const reset = useCallback(() => { setFiles([]); setResult(null); releaseResultUrls(); setOrigDims(null); setOrigSize(0) }, [])
 
   if (files.length === 0) {
     return <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"><FileUploader accept={ACCEPT} multiple maxSizeMB={50} minFiles={1} onFiles={onFiles} /></div>
@@ -131,12 +131,12 @@ export function ImageResizerTool() {
             <div className="mt-3 flex items-center gap-4 text-sm">
               <div className="text-center">
                 <p className="text-[10px] text-slate-400">Original</p>
-                <p className="font-semibold text-slate-700">{origDims.w}×{origDims.h}</p>
+                <p className="font-semibold text-slate-700">{origDims.w}Ã—{origDims.h}</p>
               </div>
               <ArrowRight className="h-4 w-4 text-slate-300" />
               <div className="text-center">
                 <p className="text-[10px] text-slate-400">Output</p>
-                <p className="font-semibold text-brand-600">{outW}×{outH}</p>
+                <p className="font-semibold text-brand-600">{outW}Ã—{outH}</p>
               </div>
               {estimatedSize > 0 && (
                 <>
@@ -203,8 +203,8 @@ export function ImageResizerTool() {
           </ControlSection>
 
           <InfoBar>
-            {origDims && <StatBlock label="Original" value={`${origDims.w} × ${origDims.h}`} />}
-            <StatBlock label="Output" value={`${outW} × ${outH}`} />
+            {origDims && <StatBlock label="Original" value={`${origDims.w} Ã— ${origDims.h}`} />}
+            <StatBlock label="Output" value={`${outW} Ã— ${outH}`} />
             <StatBlock label="Original size" value={formatBytes(origSize)} />
             {estimatedSize > 0 && (
               <StatBlock

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useCallback, useMemo, useState } from 'react'
 import { FileUploader } from './FileUploader'
@@ -10,7 +10,7 @@ import { ErrorAlert } from './ErrorAlert'
 import { Button } from '@/components/ui/button'
 import { ToolWorkspace, ControlSection } from './ToolWorkspace'
 import { usePdfWorker } from '@/hooks/usePdfWorker'
-import { defaultOutputName, resultBlobUrl } from '@/lib/client-utils'
+import { defaultOutputName, resultBlobUrl, releaseResultUrls } from '@/lib/client-utils'
 import { Shield, Eye, EyeOff, Lock, CheckCircle2, XCircle } from 'lucide-react'
 
 function getPasswordStrength(pw: string): { score: number; label: string; color: string } {
@@ -43,7 +43,7 @@ export function PdfProtectTool() {
 
   const onFiles = useCallback((files: File[]) => {
     setFile(files[0])
-    setResult(null)
+    setResult(null); releaseResultUrls()
     setLocalError(null)
   }, [])
 
@@ -73,7 +73,7 @@ export function PdfProtectTool() {
     setFile(null)
     setPassword('')
     setConfirm('')
-    setResult(null)
+    setResult(null); releaseResultUrls()
     setLocalError(null)
   }, [])
 
@@ -168,7 +168,7 @@ export function PdfProtectTool() {
             {worker.running && <Button variant="ghost" onClick={worker.cancel}>Cancel</Button>}
           </div>
           <ProgressBar value={worker.progress} label={worker.label} />
-          {worker.running && <ProcessingOverlay label={worker.label || 'Protecting PDF…'} progress={worker.progress} onCancel={worker.cancel} />}
+          {worker.running && <ProcessingOverlay label={worker.label || 'Protecting PDFâ€¦'} progress={worker.progress} onCancel={worker.cancel} />}
         </>
       }
     />

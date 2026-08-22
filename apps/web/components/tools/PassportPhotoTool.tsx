@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { FileUploader } from './FileUploader'
@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useImageWorker } from '@/hooks/useImageWorker'
 import { usePdfWorker } from '@/hooks/usePdfWorker'
-import { fileToImagePayload, resultBlobUrl } from '@/lib/client-utils'
+import { fileToImagePayload, resultBlobUrl, releaseResultUrls } from '@/lib/client-utils'
 import { Globe, Printer } from 'lucide-react'
 
 const ACCEPT = 'image/jpeg,image/png,image/webp'
@@ -18,14 +18,14 @@ const ACCEPT = 'image/jpeg,image/png,image/webp'
 interface PhotoPreset { id: string; name: string; country: string; width: number; height: number; desc: string }
 
 const PRESETS: PhotoPreset[] = [
-  { id: 'us-passport', name: 'US Passport', country: 'USA', width: 600, height: 600, desc: '2×2 in (51×51mm)' },
-  { id: 'us-visa', name: 'US Visa', country: 'USA', width: 600, height: 600, desc: '2×2 in (51×51mm)' },
-  { id: 'uk-passport', name: 'UK Passport', country: 'UK', width: 420, height: 525, desc: '35×45mm' },
-  { id: 'eu-id', name: 'EU ID Card', country: 'EU', width: 420, height: 525, desc: '35×45mm' },
-  { id: 'canada-passport', name: 'Canada Passport', country: 'Canada', width: 420, height: 540, desc: '35×45mm' },
-  { id: 'australia-passport', name: 'Australia', country: 'Australia', width: 420, height: 525, desc: '35×45mm' },
-  { id: 'india-passport', name: 'India Passport', country: 'India', width: 600, height: 600, desc: '2×2 in (51×51mm)' },
-  { id: 'china-passport', name: 'China Passport', country: 'China', width: 390, height: 567, desc: '33×48mm' },
+  { id: 'us-passport', name: 'US Passport', country: 'USA', width: 600, height: 600, desc: '2Ã—2 in (51Ã—51mm)' },
+  { id: 'us-visa', name: 'US Visa', country: 'USA', width: 600, height: 600, desc: '2Ã—2 in (51Ã—51mm)' },
+  { id: 'uk-passport', name: 'UK Passport', country: 'UK', width: 420, height: 525, desc: '35Ã—45mm' },
+  { id: 'eu-id', name: 'EU ID Card', country: 'EU', width: 420, height: 525, desc: '35Ã—45mm' },
+  { id: 'canada-passport', name: 'Canada Passport', country: 'Canada', width: 420, height: 540, desc: '35Ã—45mm' },
+  { id: 'australia-passport', name: 'Australia', country: 'Australia', width: 420, height: 525, desc: '35Ã—45mm' },
+  { id: 'india-passport', name: 'India Passport', country: 'India', width: 600, height: 600, desc: '2Ã—2 in (51Ã—51mm)' },
+  { id: 'china-passport', name: 'China Passport', country: 'China', width: 390, height: 567, desc: '33Ã—48mm' },
   { id: 'custom', name: 'Custom Size', country: '', width: 600, height: 600, desc: 'Your own size' },
 ]
 
@@ -72,17 +72,17 @@ export function PassportPhotoTool() {
   const outW = presetId === 'custom' ? parseInt(customW, 10) || 600 : currentPreset.width
   const outH = presetId === 'custom' ? parseInt(customH, 10) || 600 : currentPreset.height
 
-  const onFiles = useCallback((files: File[]) => { setFile(files[0]); setResult(null); setCrop(null); setSheetPreview(null); setSheetBlob(null) }, [])
+  const onFiles = useCallback((files: File[]) => { setFile(files[0]); setResult(null); releaseResultUrls(); setCrop(null); setSheetPreview(null); setSheetBlob(null) }, [])
 
   const processPhoto = useCallback(async () => {
     if (!file || !crop) return
-    setResult(null)
+    setResult(null); releaseResultUrls()
     const payload = await fileToImagePayload(file)
     const [cropped] = await worker.run('crop', { files: [payload], opts: { x: crop.x, y: crop.y, width: crop.w, height: crop.h } })
     const [resized] = await worker.run('resize', { files: [{ bytes: cropped.bytes, mime: cropped.mime, name: cropped.name }], opts: { width: outW, height: outH, fit: 'cover' } })
     const [final_] = await worker.run('fill-background', { files: [{ bytes: resized.bytes, mime: resized.mime, name: resized.name }], opts: { color: bgColor } })
     const photoUrl = resultBlobUrl(final_.mime, final_.bytes)
-    setResult([{ name: `passport-photo-${outW}x${outH}.png`, url: photoUrl, size: final_.size, detail: `${outW}×${outH}px | ${currentPreset.name}` }])
+    setResult([{ name: `passport-photo-${outW}x${outH}.png`, url: photoUrl, size: final_.size, detail: `${outW}Ã—${outH}px | ${currentPreset.name}` }])
 
     const { paperW, paperH, cols, rows, margin, gap } = calcSheetLayout(outW, outH, paperSize, orientation)
     const canvas = new OffscreenCanvas(paperW, paperH)
@@ -120,7 +120,7 @@ export function PassportPhotoTool() {
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([res.bytes as BlobPart], { type: 'application/pdf' })); a.download = `passport-sheet-${paperSize}-${orientation}.pdf`; a.click()
   }, [sheetBlob, pdfWorker, paperSize, orientation])
 
-  const reset = useCallback(() => { setFile(null); setResult(null); setCrop(null); setSheetPreview(null); setSheetBlob(null) }, [])
+  const reset = useCallback(() => { setFile(null); setResult(null); releaseResultUrls(); setCrop(null); setSheetPreview(null); setSheetBlob(null) }, [])
   const layout = calcSheetLayout(outW, outH, paperSize, orientation)
 
   return (
@@ -200,7 +200,7 @@ export function PassportPhotoTool() {
             </div>
             <p className="mt-2 text-xs text-slate-400">
               <Printer className="mr-1 inline h-3 w-3" />
-              {layout.cols}×{layout.rows} = {layout.cols * layout.rows} photos per sheet
+              {layout.cols}Ã—{layout.rows} = {layout.cols * layout.rows} photos per sheet
             </p>
           </div>
 
@@ -216,7 +216,7 @@ export function PassportPhotoTool() {
                   <div key={i} className="text-center">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={item.url} alt="Passport photo" className="rounded-lg border border-slate-200 shadow-sm" style={{ maxWidth: 200 }} />
-                    <p className="mt-1 text-xs text-slate-400">{outW}×{outH}px</p>
+                    <p className="mt-1 text-xs text-slate-400">{outW}Ã—{outH}px</p>
                   </div>
                 ))}
               </div>

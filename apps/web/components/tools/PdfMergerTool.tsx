@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useCallback, useRef, useState } from 'react'
 import { FileUploader } from './FileUploader'
@@ -8,7 +8,7 @@ import { ErrorAlert } from './ErrorAlert'
 import { Button } from '@/components/ui/button'
 import { ToolWorkspace, ControlSection } from './ToolWorkspace'
 import { usePdfWorker } from '@/hooks/usePdfWorker'
-import { defaultOutputName, resultBlobUrl } from '@/lib/client-utils'
+import { defaultOutputName, resultBlobUrl, releaseResultUrls } from '@/lib/client-utils'
 import { renderThumbnails } from '@/lib/pdfjs'
 import { GripVertical, X, Plus, FileText } from 'lucide-react'
 
@@ -36,7 +36,7 @@ export function PdfMergerTool() {
       }
     }
     setFiles((prev) => [...prev, ...withThumbs])
-    setResult(null)
+    setResult(null); releaseResultUrls()
   }, [])
 
   const move = useCallback((index: number, dir: -1 | 1) => {
@@ -81,14 +81,14 @@ export function PdfMergerTool() {
 
   const run = useCallback(async () => {
     if (files.length < 2) return
-    setResult(null)
+    setResult(null); releaseResultUrls()
     const arrays = await Promise.all(files.map((f) => f.file.arrayBuffer()))
     const res = await worker.run('merge', { files: arrays.map((b) => new Uint8Array(b)) })
     const name = `merged-${files.length}-files-${totalPages}-pages.pdf`
-    setResult([{ name, url: resultBlobUrl('application/pdf', res.bytes), size: res.bytes.byteLength, detail: `${files.length} files — ${totalPages} pages` }])
+    setResult([{ name, url: resultBlobUrl('application/pdf', res.bytes), size: res.bytes.byteLength, detail: `${files.length} files â€” ${totalPages} pages` }])
   }, [files, worker, totalPages])
 
-  const reset = useCallback(() => { setFiles([]); setResult(null) }, [])
+  const reset = useCallback(() => { setFiles([]); setResult(null); releaseResultUrls() }, [])
 
   if (files.length === 0) {
     return <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"><FileUploader accept="application/pdf" multiple maxSizeMB={200} minFiles={2} hint="Drop 2 or more PDF files, or browse" onFiles={onFiles} /></div>
@@ -114,7 +114,7 @@ export function PdfMergerTool() {
       preview={
         <div className="h-full overflow-auto p-4">
           <div className="mb-3 text-center text-xs text-slate-400">
-            Drag to reorder — final merge order shown below
+            Drag to reorder â€” final merge order shown below
           </div>
           <div className="space-y-3">
             {files.map((f, fi) => (
@@ -188,7 +188,7 @@ export function PdfMergerTool() {
 
           <div className="flex items-center gap-3">
             <Button size="lg" loading={worker.running} disabled={files.length < 2} onClick={() => void run()}>
-              Merge {files.length} PDFs → {totalPages} pages
+              Merge {files.length} PDFs â†’ {totalPages} pages
             </Button>
             {worker.running && <Button variant="ghost" onClick={worker.cancel}>Cancel</Button>}
           </div>

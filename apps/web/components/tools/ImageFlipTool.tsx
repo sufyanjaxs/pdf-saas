@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useCallback, useState } from 'react'
 import { FileUploader } from './FileUploader'
@@ -8,7 +8,8 @@ import { ErrorAlert } from './ErrorAlert'
 import { Button } from '@/components/ui/button'
 import { ToolWorkspace, ControlSection } from './ToolWorkspace'
 import { useImageWorker } from '@/hooks/useImageWorker'
-import { fileToImagePayload, resultBlobUrl } from '@/lib/client-utils'
+import { fileToImagePayload, resultBlobUrl, releaseResultUrls } from '@/lib/client-utils'
+import { BlobImg } from './BlobImg'
 import { FlipHorizontal, FlipVertical } from 'lucide-react'
 
 const ACCEPT = 'image/jpeg,image/png,image/webp'
@@ -19,20 +20,20 @@ export function ImageFlipTool() {
   const [result, setResult] = useState<ResultItem[] | null>(null)
   const worker = useImageWorker()
 
-  const onFiles = useCallback((f: File[]) => { setFiles(f); setResult(null) }, [])
+  const onFiles = useCallback((f: File[]) => { setFiles(f); setResult(null); releaseResultUrls() }, [])
 
   const run = useCallback(async () => {
     if (files.length === 0) return
-    setResult(null)
+    setResult(null); releaseResultUrls()
     const payloads = await Promise.all(files.map((f) => fileToImagePayload(f)))
     const res = await worker.run('flip', { files: payloads, opts: { direction } })
     const items: ResultItem[] = res.map((r: any) => ({
-      name: r.name, url: resultBlobUrl(r.mime, r.bytes), size: r.size, detail: `${r.width}×${r.height}px | Flipped ${direction}`,
+      name: r.name, url: resultBlobUrl(r.mime, r.bytes), size: r.size, detail: `${r.width}Ã—${r.height}px | Flipped ${direction}`,
     }))
     setResult(items)
   }, [files, direction, worker])
 
-  const reset = useCallback(() => { setFiles([]); setResult(null); setDirection('horizontal') }, [])
+  const reset = useCallback(() => { setFiles([]); setResult(null); releaseResultUrls(); setDirection('horizontal') }, [])
 
   if (files.length === 0) {
     return <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"><FileUploader accept={ACCEPT} multiple maxSizeMB={50} minFiles={1} onFiles={onFiles} /></div>
@@ -48,9 +49,7 @@ export function ImageFlipTool() {
         <div className="flex h-full flex-col items-center justify-center p-4">
           <div className="overflow-hidden rounded-lg" style={{ transform: direction === 'horizontal' ? 'scaleX(-1)' : 'scaleY(-1)' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={URL.createObjectURL(files[0])}
-              alt="Preview"
+            <BlobImg file={files[0]} alt="Preview"
               className="max-h-[50vh] max-w-full rounded bg-white shadow-sm"
               style={{ transform: 'none' }}
             />
@@ -72,7 +71,7 @@ export function ImageFlipTool() {
                 <FlipHorizontal className={`h-6 w-6 ${direction === 'horizontal' ? 'text-brand-600' : 'text-slate-400'}`} />
                 <div className="text-left">
                   <p className={`text-sm font-medium ${direction === 'horizontal' ? 'text-brand-700' : 'text-slate-700'}`}>Horizontal</p>
-                  <p className="text-[10px] text-slate-400">Left ↔ Right</p>
+                  <p className="text-[10px] text-slate-400">Left â†” Right</p>
                 </div>
               </button>
               <button
@@ -85,7 +84,7 @@ export function ImageFlipTool() {
                 <FlipVertical className={`h-6 w-6 ${direction === 'vertical' ? 'text-brand-600' : 'text-slate-400'}`} />
                 <div className="text-left">
                   <p className={`text-sm font-medium ${direction === 'vertical' ? 'text-brand-700' : 'text-slate-700'}`}>Vertical</p>
-                  <p className="text-[10px] text-slate-400">Top ↔ Bottom</p>
+                  <p className="text-[10px] text-slate-400">Top â†” Bottom</p>
                 </div>
               </button>
             </div>

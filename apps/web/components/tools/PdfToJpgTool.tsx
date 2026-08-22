@@ -13,6 +13,7 @@ import { Card } from '@/components/ui/card'
 import { usePdfPages } from '@/hooks/usePdfPages'
 import { pdfToJpeg } from '@/lib/pdfjs'
 import { formatBytes } from '@pdf-saas/file-utils'
+import { resultBlobUrl, releaseResultUrls } from '@/lib/client-utils'
 
 type Scope = 'all' | 'selected'
 
@@ -30,6 +31,7 @@ export function PdfToJpgTool() {
       const f = files[0]
       setFile(f)
       setResult(null)
+      releaseResultUrls()
       setError(null)
       setSelected(new Set())
       setScope('all')
@@ -52,6 +54,7 @@ export function PdfToJpgTool() {
   const run = useCallback(async () => {
     if (!file || targets.length === 0) return
     setResult(null)
+    releaseResultUrls()
     setError(null)
     setProgress(0)
     try {
@@ -63,11 +66,13 @@ export function PdfToJpgTool() {
         onProgress: setProgress,
       })
       const base = file.name.replace(/\.pdf$/i, '')
-      const items: ResultItem[] = outputs.map((o) => ({
-        name: `${base}-page-${o.pageNumber}.jpg`,
-        url: URL.createObjectURL(o.blob),
-        size: o.blob.size,
-      }))
+      const items: ResultItem[] = await Promise.all(
+        outputs.map(async (o) => ({
+          name: `${base}-page-${o.pageNumber}.jpg`,
+          url: resultBlobUrl(o.blob.type || 'image/jpeg', new Uint8Array(await o.blob.arrayBuffer())),
+          size: o.blob.size,
+        })),
+      )
       setResult(items)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to convert PDF to JPG')
@@ -80,6 +85,7 @@ export function PdfToJpgTool() {
     setFile(null)
     setSelected(new Set())
     setResult(null)
+    releaseResultUrls()
     setError(null)
   }, [])
 

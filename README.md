@@ -4,7 +4,7 @@ A free, browser-only PDF, image, and document toolbox. Everything runs locally i
 
 ## Features
 
-23 tools, split into three categories:
+34 tools, split into three categories:
 
 **PDF Tools**
 - Split PDF
@@ -25,9 +25,20 @@ A free, browser-only PDF, image, and document toolbox. Everything runs locally i
 **Image Tools**
 - Compress Image
 - Resize Image
+- Resize for Purpose
 - Crop Image
 - Convert Image
 - Add Text to Image
+- Passport Photo
+- Circle Image
+- Remove Background (solid/simple backgrounds)
+- Image Quality Analyzer
+- Rotate Image
+- Flip Image
+- Grayscale Image
+- Brightness & Contrast
+- Blur Image
+- Sharpen Image
 
 **Office Conversion**
 - PDF → Word
@@ -37,7 +48,7 @@ A free, browser-only PDF, image, and document toolbox. Everything runs locally i
 
 ## Why it's fast
 
-- **100% local processing** — your files never leave the device. PDF operations run in a Web Worker with [pdf-lib](https://github.com/Hopding/PDF-LIB), rendering and PDF→JPG use [PDF.js](https://mozilla.github.io/pdf.js/), and image operations use the browser-native Canvas API.
+- **100% local processing** — your files never leave the device. PDF operations run in a Web Worker with [@cantoo/pdf-lib](https://github.com/cantoo-scribe/pdf-lib), rendering and PDF→JPG use [PDF.js](https://mozilla.github.io/pdf.js/), and image operations use the browser-native Canvas API.
 - **Office conversions** — PDF→Word, PDF→Excel, and PDF→PowerPoint use [pdf.js](https://mozilla.github.io/pdf.js/), [docx](https://github.com/dolanmiu/docx), [exceljs](https://github.com/exceljs/exceljs), and [PptxGenJS](https://github.com/gitbrent/PptxGenJS) to build downloadable `.docx` / `.xlsx` / `.pptx` files. Word→PDF extracts the text and renders it to a PDF.
 - **No account, no sign-up** — open a tool and use it.
 - **Lazy-loaded tools** — each tool page loads its code on demand, keeping first paint tiny.
@@ -47,7 +58,7 @@ A free, browser-only PDF, image, and document toolbox. Everything runs locally i
 
 - [Next.js](https://nextjs.org/) 14 (App Router, SSG) + React 18 + [Tailwind CSS](https://tailwindcss.com/)
 - [Turborepo](https://turbo.build/) workspaces — `apps/web` + shared `packages/*`
-- [pdf-lib](https://github.com/Hopding/PDF-LIB) (MIT) — PDF manipulation
+- [@cantoo/pdf-lib](https://github.com/cantoo-scribe/pdf-lib) (MIT) — PDF manipulation
 - [pdf.js](https://mozilla.github.io/pdf.js/) (Apache-2.0) — PDF rendering / thumbnails / PDF→JPG / office extraction
 - [docx](https://github.com/dolanmiu/docx) (MIT) — PDF→Word
 - [exceljs](https://github.com/exceljs/exceljs) (MIT) — PDF→Excel
@@ -62,7 +73,7 @@ packages/shared        Tool metadata + Web Worker protocol types
 packages/file-utils    Validation, page ranges, formatting, download helpers
 packages/pdf-engine    All PDF operations (split, merge, rotate, compress, ...)
 packages/image-engine  Image operations (resize, crop, convert, compress)
-apps/web               Next.js app — 23 tools + landing page
+apps/web               Next.js app — 34 tools + landing page
 scripts                pdf.js worker copy script
 ```
 

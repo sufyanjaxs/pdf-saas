@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Download, RefreshCw, FileText } from 'lucide-react'
 import { formatBytes } from '@pdf-saas/file-utils'
 import { loadPdfDocument } from '@/lib/pdfjs'
+import { useBlobUrl } from '@/lib/client-utils'
 
 export interface PdfResultViewProps {
   name: string
@@ -25,7 +26,11 @@ export function PdfResultView({ name, file, size, pageCount = 1, detail, onReset
   const [preview, setPreview] = useState<string | null>(null)
   const [previewError, setPreviewError] = useState(false)
 
-  const blobUrl = typeof file === 'string' ? file : URL.createObjectURL(file)
+  // String URLs are owned by the caller (result registry); Blobs get a
+  // hook-managed URL that is revoked on change/unmount instead of leaking
+  // one per render.
+  const ownUrl = useBlobUrl(typeof file === 'string' ? null : (file as Blob))
+  const blobUrl = typeof file === 'string' ? file : (ownUrl ?? '')
 
   useEffect(() => {
     let active = true
@@ -65,9 +70,8 @@ export function PdfResultView({ name, file, size, pageCount = 1, detail, onReset
   }, [blobUrl, name])
 
   const reset = useCallback(() => {
-    if (typeof file !== 'string') URL.revokeObjectURL(blobUrl)
     onReset()
-  }, [blobUrl, file, onReset])
+  }, [onReset])
 
   return (
     <div className="space-y-4">

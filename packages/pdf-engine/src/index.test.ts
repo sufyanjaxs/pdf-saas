@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { PDFDocument } from '@cantoo/pdf-lib'
+import { PDFDocument, PDFName, PDFArray, PDFRawStream } from '@cantoo/pdf-lib'
 import {
   splitPdf,
   deletePages,
@@ -16,6 +16,8 @@ import {
   cropPdf,
   parseRanges,
   textToPdf,
+  filterIsJpeg,
+  recompressJpegs,
 } from '../src/index'
 
 async function makeTestPdf(pages: number): Promise<Uint8Array> {
@@ -196,5 +198,91 @@ describe('cropPdf', () => {
     const box = doc.getPage(0).getCropBox()
     expect(box.width).toBeLessThan(300)
     expect(box.height).toBeLessThan(400)
+  })
+})
+
+describe('filterIsJpeg (regression: DCTDecode detection)', () => {
+  it('detects a bare /DCTDecode name', () => {
+    expect(filterIsJpeg(PDFName.of('DCTDecode'))).toBe(true)
+  })
+
+  it('rejects other filter names', () => {
+    expect(filterIsJpeg(PDFName.of('FlateDecode'))).toBe(false)
+    expect(filterIsJpeg(undefined)).toBe(false)
+  })
+
+  it('detects DCTDecode inside a filter array', async () => {
+    const doc = await PDFDocument.create()
+    const arr = PDFArray.withContext(doc.context)
+    arr.push(PDFName.of('FlateDecode'))
+    arr.push(PDFName.of('DCTDecode'))
+    expect(filterIsJpeg(arr)).toBe(true)
+
+    const noJpeg = PDFArray.withContext(doc.context)
+    noJpeg.push(PDFName.of('FlateDecode'))
+    expect(filterIsJpeg(noJpeg)).toBe(false)
+  })
+})
+
+describe('recompressJpegs (regression: streams must actually be swapped)', () => {
+  // @cantoo/pdf-lib registers embedded images lazily at save(), so we must
+  // round-trip through bytes before the image appears as an indirect object.
+  async function makeJpegPdf(): Promise<PDFDocument> {
+    const jpegBytes = new Uint8Array(
+      await (await import('node:fs/promises')).readFile(new URL('./fixtures/photo.jpg', import.meta.url)),
+    )
+    const doc = await PDFDocument.create()
+    const page = doc.addPage([300, 400])
+    const img = await doc.embedJpg(jpegBytes)
+    page.drawImage(img, { x: 50, y: 100, width: 200, height: 200 })
+    return PDFDocument.load(await doc.save())
+  }
+
+  function jpegStreams(doc: PDFDocument): PDFRawStream[] {
+    return (doc as any).context.enumerateIndirectObjects().map(([, obj]: any) => obj).filter(
+      (obj: any) => obj instanceof PDFRawStream && filterIsJpeg(obj.dict.get(PDFName.of('Filter'))),
+    )
+  }
+
+  it('swaps the JPEG stream when re-encoding shrinks it', async () => {
+    const doc = await makeJpegPdf()
+    const before = jpegStreams(doc)
+    expect(before.length).toBe(1)
+    const originalLength = before[0].contents.length
+
+    const fakeReencode = async () => new Uint8Array(Math.floor(originalLength / 2))
+    await recompressJpegs(doc, 0.5, fakeReencode)
+
+    const after = jpegStreams(doc)
+    expect(after.length).toBe(1)
+    expect(after[0].contents.length).toBe(Math.floor(originalLength / 2))
+    expect(after[0].dict.get(PDFName.of('Length')).asNumber()).toBe(after[0].contents.length)
+
+    const saved = await doc.save()
+    const reloaded = await PDFDocument.load(saved)
+    expect(reloaded.getPageCount()).toBe(1)
+    expect(jpegStreams(reloaded)[0].contents.length).toBe(Math.floor(originalLength / 2))
+  })
+
+  it('leaves the stream untouched when re-encoding grows it', async () => {
+    const doc = await makeJpegPdf()
+    const before = jpegStreams(doc)
+    const originalBytes = before[0].contents.slice()
+
+    await recompressJpegs(doc, 0.5, async () => new Uint8Array(originalBytes.length + 500))
+
+    const after = jpegStreams(doc)
+    expect(after.length).toBe(1)
+    expect(Array.from(after[0].contents)).toEqual(Array.from(originalBytes))
+  })
+
+  it('propagates width/height/quality to the reencoder', async () => {
+    const doc = await makeJpegPdf()
+    const calls: Array<[number, number, number]> = []
+    await recompressJpegs(doc, 0.42, async (_bytes, w, h, q) => {
+      calls.push([w, h, q])
+      return null
+    })
+    expect(calls).toEqual([[120, 120, 0.42]])
   })
 })

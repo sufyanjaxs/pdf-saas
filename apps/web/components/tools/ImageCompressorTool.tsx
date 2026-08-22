@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useCallback, useState } from 'react'
 import { FileUploader } from './FileUploader'
@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { BeforeAfterSlider } from '@/components/ui/before-after-slider'
 import { useImageWorker } from '@/hooks/useImageWorker'
-import { fileToImagePayload, resultBlobUrl } from '@/lib/client-utils'
+import { fileToImagePayload, resultBlobUrl, releaseResultUrls } from '@/lib/client-utils'
 import { formatBytes } from '@pdf-saas/file-utils'
 import { ShieldCheck, TrendingDown, Zap, Target, Settings2, AlertTriangle } from 'lucide-react'
 
@@ -92,7 +92,7 @@ export function ImageCompressorTool() {
 
   const onFiles = useCallback(async (incoming: File[]) => {
     setFiles(incoming)
-    setResult(null)
+    setResult(null); releaseResultUrls()
     setBeforeAfter(null)
     setQualityWarning(null)
     if (incoming.length === 1) {
@@ -108,7 +108,7 @@ export function ImageCompressorTool() {
 
   const run = useCallback(async () => {
     if (files.length === 0) return
-    setResult(null)
+    setResult(null); releaseResultUrls()
     setBeforeAfter(null)
     setPngWarn(false)
     setQualityWarning(null)
@@ -129,7 +129,7 @@ export function ImageCompressorTool() {
         opts: { format: effectiveFormat, targetSizeKB: parseInt(targetSizeKB, 10), quality, minQuality: minQ },
       })
       const items: ResultItem[] = res.map((r: any) => ({
-        name: r.name, url: resultBlobUrl(r.mime, r.bytes), size: r.size, detail: `${r.width}×${r.height} | q${r.quality}`,
+        name: r.name, url: resultBlobUrl(r.mime, r.bytes), size: r.size, detail: `${r.width}Ã—${r.height} | q${r.quality}`,
       }))
       const before = files.reduce((s, f) => s + f.size, 0)
       const after = res.reduce((s: number, r: any) => s + r.size, 0)
@@ -145,7 +145,7 @@ export function ImageCompressorTool() {
         opts: { format: effectiveFormat, quality, minQuality: contentInfo ? getMinQuality(contentInfo.type) : undefined },
       })
       const items: ResultItem[] = res.map((r: any) => ({
-        name: r.name, url: resultBlobUrl(r.mime, r.bytes), size: r.size, detail: `${r.width}×${r.height} | q${r.quality}`,
+        name: r.name, url: resultBlobUrl(r.mime, r.bytes), size: r.size, detail: `${r.width}Ã—${r.height} | q${r.quality}`,
       }))
       const before = files.reduce((s, f) => s + f.size, 0)
       const after = res.reduce((s: number, r: any) => s + r.size, 0)
@@ -155,7 +155,7 @@ export function ImageCompressorTool() {
   }, [files, format, quality, targetMode, targetSizeKB, worker, contentInfo])
 
   const reset = useCallback(() => {
-    setFiles([]); setResult(null); setBeforeAfter(null); setContentInfo(null); setPngWarn(false)
+    setFiles([]); setResult(null); releaseResultUrls(); setBeforeAfter(null); setContentInfo(null); setPngWarn(false)
     setTargetMode(false); setTargetSizeKB('200'); setPresetId('balanced'); setQuality(75); setFormat('image/jpeg')
     setQualityWarning(null)
   }, [])
@@ -303,7 +303,7 @@ export function ImageCompressorTool() {
                   <p className="text-xs text-slate-400">Original</p>
                   <p className="font-bold text-slate-700">{formatBytes(beforeAfter.originalSize)}</p>
                 </div>
-                <span className="text-2xl text-slate-300">→</span>
+                <span className="text-2xl text-slate-300">â†’</span>
                 <div className="text-center">
                   <p className="text-xs text-slate-400">Compressed</p>
                   <p className="font-bold text-emerald-600">{formatBytes(beforeAfter.compressedSize)}</p>

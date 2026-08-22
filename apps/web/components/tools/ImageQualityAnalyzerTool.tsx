@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useCallback, useState } from 'react'
 import { FileUploader } from './FileUploader'
@@ -8,7 +8,7 @@ import { ErrorAlert } from './ErrorAlert'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useImageWorker } from '@/hooks/useImageWorker'
-import { fileToImagePayload, resultBlobUrl } from '@/lib/client-utils'
+import { fileToImagePayload, resultBlobUrl, releaseResultUrls } from '@/lib/client-utils'
 import { ArrowLeft, Camera, Star, FileText, Gauge, Layers, Image as ImageIcon, Download } from 'lucide-react'
 import Link from 'next/link'
 
@@ -16,10 +16,10 @@ const ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,image/bmp'
 type ToolTab = 'upload' | 'results'
 
 const TOOL_SLUGS = [
-  { slug: 'image-resize', label: 'Resize', icon: '↔️', desc: 'Change image dimensions' },
-  { slug: 'image-compress', label: 'Compress', icon: '📦', desc: 'Reduce file size' },
-  { slug: 'image-crop', label: 'Crop', icon: '✂️', desc: 'Crop to focus area' },
-  { slug: 'image-converter', label: 'Convert Format', icon: '🔄', desc: 'Convert to JPG/PNG/WebP' },
+  { slug: 'image-resize', label: 'Resize', icon: 'â†”ï¸', desc: 'Change image dimensions' },
+  { slug: 'image-compress', label: 'Compress', icon: 'ðŸ“¦', desc: 'Reduce file size' },
+  { slug: 'image-crop', label: 'Crop', icon: 'âœ‚ï¸', desc: 'Crop to focus area' },
+  { slug: 'image-converter', label: 'Convert Format', icon: 'ðŸ”„', desc: 'Convert to JPG/PNG/WebP' },
 ]
 
 interface AnalysisData {
@@ -39,9 +39,9 @@ interface AnalysisData {
 function getVerdict(score: number): string {
   if (score >= 90) return 'Excellent quality'
   if (score >= 75) return 'Good quality'
-  if (score >= 50) return 'Average quality — improvements possible'
-  if (score >= 30) return 'Below average — room for improvement'
-  return 'Poor quality — significant issues detected'
+  if (score >= 50) return 'Average quality â€” improvements possible'
+  if (score >= 30) return 'Below average â€” room for improvement'
+  return 'Poor quality â€” significant issues detected'
 }
 
 function getColor(score: number): string {
@@ -71,33 +71,33 @@ function analyzeFile(file: File, dims: { width: number; height: number }): Analy
   const recommendations: { title: string; description: string; tool: string; action: string }[] = []
 
   if (megapixels >= 12) { score += 15; score = Math.min(score, 100) } else if (megapixels >= 5) { score += 8; score = Math.min(score, 100) }
-  else if (megapixels < 0.3) { score -= 25; qualityIssues.push('Very low resolution — fewer than 0.3 megapixels') }
-  else if (megapixels < 1) { score -= 10; qualityIssues.push('Low resolution — under 1 megapixel') }
+  else if (megapixels < 0.3) { score -= 25; qualityIssues.push('Very low resolution â€” fewer than 0.3 megapixels') }
+  else if (megapixels < 1) { score -= 10; qualityIssues.push('Low resolution â€” under 1 megapixel') }
 
   const shortSide = Math.min(dims.width, dims.height)
-  if (dims.width > 8000 || dims.height > 8000) { score -= 10; qualityIssues.push('Unusually large dimensions — potential overkill for most uses') }
-  if (shortSide < 200 && file.size > 500_000) { score -= 15; qualityIssues.push('Small image with unusually high file size — possible poor compression') }
+  if (dims.width > 8000 || dims.height > 8000) { score -= 10; qualityIssues.push('Unusually large dimensions â€” potential overkill for most uses') }
+  if (shortSide < 200 && file.size > 500_000) { score -= 15; qualityIssues.push('Small image with unusually high file size â€” possible poor compression') }
 
   const bytesPerPixel = file.size / (dims.width * dims.height)
   const bppKB = bytesPerPixel * 1024
   if (ext === 'jpg' || ext === 'jpeg') {
-    if (bppKB < 0.03) { score -= 15; qualityIssues.push('Heavily compressed JPEG — likely visible compression artifacts') }
+    if (bppKB < 0.03) { score -= 15; qualityIssues.push('Heavily compressed JPEG â€” likely visible compression artifacts') }
     else if (bppKB < 0.06) { score -= 5; qualityIssues.push('Light JPEG compression detected') }
   }
-  if (ext === 'png' && file.size > 10_000_000) { qualityIssues.push('Very large PNG — may benefit from conversion or recompression') }
+  if (ext === 'png' && file.size > 10_000_000) { qualityIssues.push('Very large PNG â€” may benefit from conversion or recompression') }
 
   const mins = [800, 1200, 1920, 3840]
   const idealPx = mins.filter((m) => dims.width >= m || dims.height >= m).pop() ?? mins[0]
 
   if (dims.width > 4000 || dims.height > 4000) {
     score -= 5
-    qualityIssues.push('Over 4000px — may be too large for web or social media')
-    recommendations.push({ title: 'Resize for sharing', description: `Reduce from ${dims.width}×${dims.height} to a web-friendly ${idealPx}px on the long side.`, tool: 'image-resize', action: `Resize to ${idealPx}px` })
+    qualityIssues.push('Over 4000px â€” may be too large for web or social media')
+    recommendations.push({ title: 'Resize for sharing', description: `Reduce from ${dims.width}Ã—${dims.height} to a web-friendly ${idealPx}px on the long side.`, tool: 'image-resize', action: `Resize to ${idealPx}px` })
   }
 
   if (file.size > 5_000_000 && (ext === 'jpg' || ext === 'jpeg' || ext === 'png')) {
     score -= 10
-    qualityIssues.push('Large file size — may be slow to load or upload')
+    qualityIssues.push('Large file size â€” may be slow to load or upload')
     recommendations.push({ title: 'Compress to save space', description: 'Reduce file size while keeping visual quality high.', tool: 'image-compress', action: 'Compress this image' })
   }
 
@@ -134,7 +134,7 @@ export function ImageQualityAnalyzerTool() {
 
   const onFiles = useCallback(async (incoming: File[]) => {
     const file = incoming[0]; if (!file) return
-    setFiles(incoming); setResult(null)
+    setFiles(incoming); setResult(null); releaseResultUrls()
     await fileToImagePayload(file)
     const dims = await new Promise<{ width: number; height: number }>((r) => {
       const img = new Image(); img.onload = () => { r({ width: img.naturalWidth, height: img.naturalHeight }); URL.revokeObjectURL(img.src) }
@@ -143,7 +143,7 @@ export function ImageQualityAnalyzerTool() {
     setAnalysis(analyzeFile(file, dims)); setPreviewUrl(URL.createObjectURL(file)); setTab('results')
   }, [])
 
-  const reset = useCallback(() => { setFiles([]); setAnalysis(null); setResult(null); setPreviewUrl(null); setTab('upload') }, [])
+  const reset = useCallback(() => { setFiles([]); setAnalysis(null); setResult(null); releaseResultUrls(); setPreviewUrl(null); setTab('upload') }, [])
 
   return (
     <Card className="relative">
@@ -174,7 +174,7 @@ export function ImageQualityAnalyzerTool() {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {[
               { icon: <Gauge className="h-4 w-4" />, label: 'File Size', value: formatBytes(analysis.fileSize) },
-              { icon: <ImageIcon className="h-4 w-4" />, label: 'Dimensions', value: `${analysis.imgWidth}×${analysis.imgHeight}` },
+              { icon: <ImageIcon className="h-4 w-4" />, label: 'Dimensions', value: `${analysis.imgWidth}Ã—${analysis.imgHeight}` },
               { icon: <Layers className="h-4 w-4" />, label: 'Megapixels', value: analysis.megapixels.toFixed(2) },
               { icon: <FileText className="h-4 w-4" />, label: 'Format', value: analysis.format },
             ].map((s, i) => (
@@ -208,7 +208,7 @@ export function ImageQualityAnalyzerTool() {
                     className="block rounded-xl border border-slate-200 p-3 text-left transition-all hover:border-brand-300 hover:bg-brand-50 hover:shadow-sm">
                     <p className="text-sm font-semibold text-slate-800">{rec.title}</p>
                     <p className="text-xs text-slate-500">{rec.description}</p>
-                    <span className="mt-1 inline-block text-xs font-semibold text-brand-600">{rec.action} →</span>
+                    <span className="mt-1 inline-block text-xs font-semibold text-brand-600">{rec.action} â†’</span>
                   </Link>
                 ))}
               </div>

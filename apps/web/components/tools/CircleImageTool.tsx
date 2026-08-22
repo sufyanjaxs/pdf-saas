@@ -9,7 +9,7 @@ import { ErrorAlert } from './ErrorAlert'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useImageWorker } from '@/hooks/useImageWorker'
-import { fileToImagePayload, resultBlobUrl } from '@/lib/client-utils'
+import { fileToImagePayload, resultBlobUrl, releaseResultUrls, useBlobUrl } from '@/lib/client-utils'
 import { Circle, Download } from 'lucide-react'
 
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,image/bmp'
@@ -26,6 +26,7 @@ export function CircleImageTool() {
   const run = useCallback(async () => {
     if (files.length === 0) return
     setResult(null)
+    releaseResultUrls()
     const payloads = await Promise.all(files.map((f) => fileToImagePayload(f)))
     const [squareStep] = await worker.run('resize', {
       files: payloads, opts: { width: size + border * 2, height: size + border * 2, fit: 'cover' }
@@ -40,7 +41,7 @@ export function CircleImageTool() {
     setResult(items)
   }, [files, size, border, borderColor, worker])
 
-  const reset = useCallback(() => { setFiles([]); setResult(null) }, [])
+  const reset = useCallback(() => { setFiles([]); setResult(null); releaseResultUrls() }, [])
 
   return (
     <Card className="relative">
@@ -122,12 +123,12 @@ export function CircleImageTool() {
 
 function CirclePreview({ file, size, border, borderColor }: { file: File; size: number; border: number; borderColor: string }) {
   const displaySize = Math.min(size, 200)
-  const previewUrl = URL.createObjectURL(file)
+  const previewUrl = useBlobUrl(file)
   return (
     <div className="flex flex-col items-center gap-2">
       <div className="relative rounded-full border-2 border-slate-200 overflow-hidden" style={{ width: displaySize, height: displaySize }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={previewUrl} alt="Preview" className="h-full w-full object-cover" />
+        {previewUrl && <img src={previewUrl} alt="Preview" className="h-full w-full object-cover" />}
         <div className="absolute inset-0 rounded-full border-2" style={{ borderColor, borderWidth: border }} />
       </div>
       <p className="text-xs text-slate-400">Preview at {displaySize}px</p>

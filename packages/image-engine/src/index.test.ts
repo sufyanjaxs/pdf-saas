@@ -8,8 +8,47 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   formatToExtension,
   detectFormat,
+  coverGeometry,
   type ImageFormat,
 } from './index'
+
+/* ------------------------------------------------------------------ */
+/* Cover-fit geometry (regression: cover must crop, not stretch)        */
+/* ------------------------------------------------------------------ */
+
+describe('coverGeometry', () => {
+  it('preserves aspect ratio when filling a square box with a wide image', () => {
+    const g = coverGeometry(800, 400, 400, 400)
+    // Scale is driven by height (the constrained axis): 400/400 = 1 → drawW = 800
+    expect(g.drawW).toBeCloseTo(800)
+    expect(g.drawH).toBeCloseTo(400)
+    expect(g.drawW / g.drawH).toBeCloseTo(2) // original aspect kept
+    expect(g.dx).toBeCloseTo((400 - 800) / 2)
+    expect(g.dy).toBeCloseTo(0)
+  })
+
+  it('fully covers the destination box', () => {
+    const cases: Array<[number, number, number, number]> = [
+      [1920, 1080, 1080, 1350],
+      [1080, 1920, 1200, 630],
+      [500, 500, 420, 525],
+      [300, 1000, 1000, 300],
+    ]
+    for (const [sw, sh, dw, dh] of cases) {
+      const g = coverGeometry(sw, sh, dw, dh)
+      expect(g.drawW).toBeGreaterThanOrEqual(dw - 1e-9)
+      expect(g.drawH).toBeGreaterThanOrEqual(dh - 1e-9)
+      expect(g.drawW / g.drawH).toBeCloseTo(sw / sh, 6)
+    }
+  })
+
+  it('centers the overflow on both axes', () => {
+    const g = coverGeometry(1600, 900, 800, 800)
+    expect(g.dx).toBeLessThanOrEqual(0)
+    expect(g.dy).toBeLessThanOrEqual(0)
+    expect(Math.abs(g.dx)).toBeCloseTo(Math.abs((800 - g.drawW) / 2))
+  })
+})
 
 /* ------------------------------------------------------------------ */
 /* Pure logic tests                                                     */

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useCallback, useRef, useState } from 'react'
 import { FileUploader } from './FileUploader'
@@ -10,16 +10,16 @@ import { ErrorAlert } from './ErrorAlert'
 import { Button } from '@/components/ui/button'
 import { ToolWorkspace, ControlSection } from './ToolWorkspace'
 import { usePdfWorker } from '@/hooks/usePdfWorker'
-import { defaultOutputName, resultBlobUrl } from '@/lib/client-utils'
+import { defaultOutputName, resultBlobUrl, releaseResultUrls } from '@/lib/client-utils'
 import { formatBytes } from '@pdf-saas/file-utils'
 import { ShieldCheck, Zap, Target } from 'lucide-react'
 
 type Level = 'balanced' | 'strong' | 'maximum'
 
 const LEVELS: { id: Level; name: string; description: string; icon: React.ReactNode; quality: string; sizeNote: string }[] = [
-  { id: 'balanced', name: 'Balanced', description: 'Lossless cleanup — removes metadata and unused objects', icon: <ShieldCheck className="h-5 w-5" />, quality: 'High', sizeNote: '5-15% smaller' },
-  { id: 'strong', name: 'Strong', description: 'Recompresses images, reduces resolution', icon: <Zap className="h-5 w-5" />, quality: 'Good', sizeNote: '20-40% smaller' },
-  { id: 'maximum', name: 'Maximum', description: 'Aggressive compression, noticeable quality loss on images', icon: <Target className="h-5 w-5" />, quality: 'Fair', sizeNote: '40-60% smaller' },
+  { id: 'balanced', name: 'Balanced', description: 'Lossless cleanup â€” removes metadata and unused objects', icon: <ShieldCheck className="h-5 w-5" />, quality: 'High', sizeNote: '5-15% smaller' },
+  { id: 'strong', name: 'Strong', description: 'Re-encodes embedded photos at ~72% JPEG quality', icon: <Zap className="h-5 w-5" />, quality: 'Good', sizeNote: '20-40% smaller' },
+  { id: 'maximum', name: 'Maximum', description: 'Re-encodes embedded photos at ~50% JPEG quality', icon: <Target className="h-5 w-5" />, quality: 'Fair', sizeNote: '40-60% smaller' },
 ]
 
 export function PdfCompressorTool() {
@@ -33,7 +33,7 @@ export function PdfCompressorTool() {
   const onFiles = useCallback(async (files: File[]) => {
     const f = files[0]
     setFile(f)
-    setResult(null)
+    setResult(null); releaseResultUrls()
     setPageCount(0)
     // Get page count via pdf.js
     try {
@@ -46,7 +46,7 @@ export function PdfCompressorTool() {
 
   const run = useCallback(async () => {
     if (!file) return
-    setResult(null)
+    setResult(null); releaseResultUrls()
     const bytes = await file.arrayBuffer()
     const res = await worker.run('compress', {
       bytes: new Uint8Array(bytes),
@@ -60,14 +60,14 @@ export function PdfCompressorTool() {
         name,
         url: resultBlobUrl('application/pdf', res.bytes),
         size: res.compressedSize,
-        detail: `${formatBytes(res.originalSize)} → ${formatBytes(res.compressedSize)} · saved ${saved}%`,
+        detail: `${formatBytes(res.originalSize)} â†’ ${formatBytes(res.compressedSize)} Â· saved ${saved}%`,
       },
     ])
   }, [file, level, worker])
 
   const reset = useCallback(() => {
     setFile(null)
-    setResult(null)
+    setResult(null); releaseResultUrls()
     setPageCount(0)
   }, [])
 
@@ -85,10 +85,10 @@ export function PdfCompressorTool() {
                 </svg>
               </div>
               <p className="text-sm font-semibold text-slate-700">{file.name}</p>
-              <p className="mt-1 text-xs text-slate-400">{formatBytes(file.size)}{pageCount > 0 && ` · ${pageCount} pages`}</p>
+              <p className="mt-1 text-xs text-slate-400">{formatBytes(file.size)}{pageCount > 0 && ` Â· ${pageCount} pages`}</p>
 
               <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs text-slate-400">Estimated result</p>
+                <p className="text-xs text-slate-400">Typical result on photo-heavy PDFs</p>
                 <p className="mt-1 text-lg font-bold text-brand-600">{currentLevel.sizeNote}</p>
                 <p className="text-xs text-slate-400">Quality: {currentLevel.quality}</p>
               </div>

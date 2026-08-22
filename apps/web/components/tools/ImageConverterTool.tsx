@@ -9,17 +9,17 @@ import { ErrorAlert } from './ErrorAlert'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useImageWorker } from '@/hooks/useImageWorker'
-import { fileToImagePayload, resultBlobUrl } from '@/lib/client-utils'
+import { fileToImagePayload, resultBlobUrl, releaseResultUrls } from '@/lib/client-utils'
 import { ArrowRight, RefreshCw, AlertTriangle } from 'lucide-react'
 
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,image/bmp'
-type OutputFormat = 'jpg' | 'png' | 'webp' | 'gif'
+type OutputFormat = 'jpg' | 'png' | 'webp'
 
+// Browsers cannot encode GIF via canvas (only decode), so GIF is decode-only.
 const FORMATS: { id: OutputFormat; label: string; mime: string; desc: string; supportsAlpha: boolean }[] = [
   { id: 'jpg', label: 'JPEG', mime: 'image/jpeg', desc: 'Best for photos, small size, no transparency', supportsAlpha: false },
   { id: 'png', label: 'PNG', mime: 'image/png', desc: 'Lossless, supports transparency', supportsAlpha: true },
   { id: 'webp', label: 'WebP', mime: 'image/webp', desc: 'Modern format, small + quality, partial alpha', supportsAlpha: true },
-  { id: 'gif', label: 'GIF', mime: 'image/gif', desc: 'Best for simple animations and graphics', supportsAlpha: true },
 ]
 
 function getFormatInfo(ext: string) {
@@ -40,6 +40,7 @@ export function ImageConverterTool() {
   const run = useCallback(async () => {
     if (files.length === 0) return
     setResult(null)
+    releaseResultUrls()
     const payloads = await Promise.all(files.map((f) => fileToImagePayload(f)))
     const res = await worker.run('convert', {
       files: payloads, opts: { format: targetFormat.mime }
@@ -51,7 +52,7 @@ export function ImageConverterTool() {
     setResult(items)
   }, [files, targetFormat, worker])
 
-  const reset = useCallback(() => { setFiles([]); setResult(null) }, [])
+  const reset = useCallback(() => { setFiles([]); setResult(null); releaseResultUrls() }, [])
 
   return (
     <Card className="relative">

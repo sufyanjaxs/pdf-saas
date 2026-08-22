@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useCallback, useEffect, useState } from 'react'
 import { FileUploader } from './FileUploader'
@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { ToolWorkspace, ControlSection } from './ToolWorkspace'
 import { CropOverlay, type CropRect } from '@/components/ui/crop-overlay'
 import { useImageWorker } from '@/hooks/useImageWorker'
-import { fileToImagePayload, resultBlobUrl } from '@/lib/client-utils'
+import { fileToImagePayload, resultBlobUrl, releaseResultUrls } from '@/lib/client-utils'
 import { RotateCcw, Grid3x3 } from 'lucide-react'
 
 const ACCEPT = 'image/jpeg,image/png,image/webp'
@@ -62,7 +62,7 @@ export function ImageCropperTool() {
 
   const onFiles = useCallback((files: File[]) => {
     setFile(files[0])
-    setResult(null)
+    setResult(null); releaseResultUrls()
     setPreset('free')
     setSel(null)
     setTrimMode(false)
@@ -78,7 +78,7 @@ export function ImageCropperTool() {
     aspectRatio = getPresetRatio(preset)
   }
 
-  // Compute display scale (natural → display coordinates)
+  // Compute display scale (natural â†’ display coordinates)
   const computeScale = useCallback((containerW: number, containerH: number) => {
     if (natural.w === 0 || natural.h === 0) return 1
     return Math.min(containerW / natural.w, containerH / natural.h, 1)
@@ -146,7 +146,7 @@ export function ImageCropperTool() {
 
   const run = useCallback(async (crop: CropRect) => {
     if (!file || displayScale === 0) return
-    setResult(null)
+    setResult(null); releaseResultUrls()
     const payload = await fileToImagePayload(file)
     const scaledCrop = {
       x: Math.round(crop.x / displayScale),
@@ -157,11 +157,11 @@ export function ImageCropperTool() {
     const [res] = await worker.run('crop', { files: [payload], opts: scaledCrop })
     const dot = file.name.lastIndexOf('.')
     const base = dot === -1 ? file.name : file.name.slice(0, dot)
-    setResult([{ name: `${base}-crop.jpg`, url: resultBlobUrl(res.mime, res.bytes), size: res.size, detail: `${res.width}×${res.height}` }])
+    setResult([{ name: `${base}-crop.jpg`, url: resultBlobUrl(res.mime, res.bytes), size: res.size, detail: `${res.width}Ã—${res.height}` }])
   }, [file, worker, displayScale])
 
   const reset = useCallback(() => {
-    setFile(null); setResult(null); setPreset('free'); setSel(null)
+    setFile(null); setResult(null); releaseResultUrls(); setPreset('free'); setSel(null)
     setTrimMode(false); setTrimValues({ top: 0, right: 0, bottom: 0, left: 0 })
   }, [])
 
@@ -196,7 +196,7 @@ export function ImageCropperTool() {
               </button>
             </div>
             {natural.w > 0 && (
-              <span className="text-xs text-slate-400">{natural.w}×{natural.h} px</span>
+              <span className="text-xs text-slate-400">{natural.w}Ã—{natural.h} px</span>
             )}
           </div>
 
@@ -262,8 +262,8 @@ export function ImageCropperTool() {
             </div>
             {cropPixels && (
               <div className="text-xs text-slate-500">
-                Crop: {cropPixels.w} × {cropPixels.h} px
-                {natural.w > 0 && <span className="ml-2 text-slate-300">| Original: {natural.w}×{natural.h}</span>}
+                Crop: {cropPixels.w} Ã— {cropPixels.h} px
+                {natural.w > 0 && <span className="ml-2 text-slate-300">| Original: {natural.w}Ã—{natural.h}</span>}
               </div>
             )}
           </div>
@@ -381,7 +381,7 @@ export function ImageCropperTool() {
               ))}
             </div>
             <p className="mt-2 text-xs text-slate-400">
-              {cropPixels ? `Result: ${cropPixels.w} × ${cropPixels.h} px` : 'Drag crop box or enter values above'}
+              {cropPixels ? `Result: ${cropPixels.w} Ã— ${cropPixels.h} px` : 'Drag crop box or enter values above'}
             </p>
           </ControlSection>
 

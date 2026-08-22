@@ -10,6 +10,7 @@ import { ErrorAlert } from './ErrorAlert'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { formatBytes } from '@pdf-saas/file-utils'
+import { resultBlobUrl, releaseResultUrls } from '@/lib/client-utils'
 
 export interface OfficeConvertCardProps {
   accept: string
@@ -39,12 +40,14 @@ export function OfficeConvertCard({
   const onFiles = useCallback((files: File[]) => {
     setFile(files[0])
     setResult(null)
+    releaseResultUrls()
     setError(null)
   }, [])
 
   const run = useCallback(async () => {
     if (!file) return
     setResult(null)
+    releaseResultUrls()
     setError(null)
     setProgress(0)
     setLabel('Starting…')
@@ -57,7 +60,7 @@ export function OfficeConvertCard({
       setResult([
         {
           name: outputName(file.name),
-          url: URL.createObjectURL(blob),
+          url: resultBlobUrl(blob.type || 'application/octet-stream', new Uint8Array(await blob.arrayBuffer())),
           size: blob.size,
         },
       ])
@@ -72,6 +75,7 @@ export function OfficeConvertCard({
   const reset = useCallback(() => {
     setFile(null)
     setResult(null)
+    releaseResultUrls()
     setError(null)
   }, [])
 

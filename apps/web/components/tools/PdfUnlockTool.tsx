@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useCallback, useState } from 'react'
 import { FileUploader } from './FileUploader'
@@ -10,7 +10,7 @@ import { ErrorAlert } from './ErrorAlert'
 import { Button } from '@/components/ui/button'
 import { ToolWorkspace, ControlSection } from './ToolWorkspace'
 import { usePdfWorker } from '@/hooks/usePdfWorker'
-import { defaultOutputName, resultBlobUrl } from '@/lib/client-utils'
+import { defaultOutputName, resultBlobUrl, releaseResultUrls } from '@/lib/client-utils'
 import { Unlock, Eye, EyeOff } from 'lucide-react'
 
 export function PdfUnlockTool() {
@@ -22,7 +22,7 @@ export function PdfUnlockTool() {
 
   const onFiles = useCallback((files: File[]) => {
     setFile(files[0])
-    setResult(null)
+    setResult(null); releaseResultUrls()
   }, [])
 
   const run = useCallback(async () => {
@@ -41,7 +41,7 @@ export function PdfUnlockTool() {
   const reset = useCallback(() => {
     setFile(null)
     setPassword('')
-    setResult(null)
+    setResult(null); releaseResultUrls()
   }, [])
 
   if (!file) {
@@ -97,7 +97,7 @@ export function PdfUnlockTool() {
             {worker.running && <Button variant="ghost" onClick={worker.cancel}>Cancel</Button>}
           </div>
           <ProgressBar value={worker.progress} label={worker.label} />
-          {worker.running && <ProcessingOverlay label={worker.label || 'Unlocking PDF…'} progress={worker.progress} onCancel={worker.cancel} />}
+          {worker.running && <ProcessingOverlay label={worker.label || 'Unlocking PDFâ€¦'} progress={worker.progress} onCancel={worker.cancel} />}
         </>
       }
     />

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { FileUploader } from './FileUploader'
@@ -10,7 +10,7 @@ import { ErrorAlert } from './ErrorAlert'
 import { Button } from '@/components/ui/button'
 import { ToolWorkspace, ControlSection, OptionButton } from './ToolWorkspace'
 import { usePdfWorker } from '@/hooks/usePdfWorker'
-import { resultBlobUrl } from '@/lib/client-utils'
+import { resultBlobUrl, releaseResultUrls } from '@/lib/client-utils'
 
 const ACCEPT = 'image/jpeg,image/png,image/webp'
 
@@ -96,14 +96,14 @@ export function JpgToPdfTool() {
       ctx.fillStyle = '#64748b'
       ctx.font = '11px sans-serif'
       ctx.textAlign = 'center'
-      ctx.fillText(`Page 1 — ${pageSize === 'original' ? 'Original Size' : pageSize.toUpperCase()} ${orientation === 'auto' ? '' : orientation}`, canvas.width / 2, canvas.height - 6)
+      ctx.fillText(`Page 1 â€” ${pageSize === 'original' ? 'Original Size' : pageSize.toUpperCase()} ${orientation === 'auto' ? '' : orientation}`, canvas.width / 2, canvas.height - 6)
     }
     img.src = URL.createObjectURL(files[0])
   }, [files, pageSize, orientation, margin, fitMode])
 
   const run = useCallback(async () => {
     if (files.length === 0) return
-    setResult(null)
+    setResult(null); releaseResultUrls()
     const arrays = await Promise.all(files.map((f) => f.arrayBuffer()))
     const res = await worker.run('images-to-pdf', {
       files: arrays.map((b) => new Uint8Array(b)),
@@ -117,7 +117,7 @@ export function JpgToPdfTool() {
     setResult([{ name, url: resultBlobUrl('application/pdf', res.bytes), size: res.bytes.byteLength, detail: `${files.length} image${files.length === 1 ? '' : 's'} | ${pageSize.toUpperCase()} ${orientation === 'auto' ? '' : orientation}` }])
   }, [files, worker, pageSize, orientation, margin, fitMode])
 
-  const reset = useCallback(() => { setFiles([]); setResult(null) }, [])
+  const reset = useCallback(() => { setFiles([]); setResult(null); releaseResultUrls() }, [])
 
   if (files.length === 0) {
     return <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"><FileUploader accept={ACCEPT} multiple maxSizeMB={50} minFiles={1} hint="Drop JPG, PNG or WEBP images, or browse" onFiles={(incoming) => setFiles(incoming)} /></div>

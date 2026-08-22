@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useCallback, useState } from 'react'
 import { FileUploader } from './FileUploader'
@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { ToolWorkspace, ControlSection } from './ToolWorkspace'
 import { usePdfPages } from '@/hooks/usePdfPages'
 import { usePdfWorker } from '@/hooks/usePdfWorker'
-import { defaultOutputName, resultBlobUrl } from '@/lib/client-utils'
+import { defaultOutputName, resultBlobUrl, releaseResultUrls } from '@/lib/client-utils'
 import { Trash2 } from 'lucide-react'
 
 export function PdfDeletePagesTool() {
@@ -25,7 +25,7 @@ export function PdfDeletePagesTool() {
     (files: File[]) => {
       const f = files[0]
       setFile(f)
-      setResult(null)
+      setResult(null); releaseResultUrls()
       setSelected(new Set())
       void load(f)
     },
@@ -62,7 +62,7 @@ export function PdfDeletePagesTool() {
   const reset = useCallback(() => {
     setFile(null)
     setSelected(new Set())
-    setResult(null)
+    setResult(null); releaseResultUrls()
   }, [])
 
   const removable = selected.size > 0 && selected.size < pageCount
@@ -110,7 +110,7 @@ export function PdfDeletePagesTool() {
                         className={`w-full rounded bg-white shadow-sm ${isMarked ? 'line-through' : ''}`} />
                       <div className="mt-1 flex items-center justify-center gap-1">
                         <span className={`text-[10px] font-medium ${isMarked ? 'text-red-500' : 'text-slate-500'}`}>{p.pageNumber}</span>
-                        {isMarked && <span className="text-[10px] text-red-500">✕</span>}
+                        {isMarked && <span className="text-[10px] text-red-500">âœ•</span>}
                       </div>
                     </button>
                   )
@@ -149,7 +149,7 @@ export function PdfDeletePagesTool() {
             {worker.running && <Button variant="ghost" onClick={worker.cancel}>Cancel</Button>}
           </div>
           <ProgressBar value={worker.progress} label={worker.label} />
-          {worker.running && <ProcessingOverlay label={worker.label || 'Deleting pages…'} progress={worker.progress} onCancel={worker.cancel} />}
+          {worker.running && <ProcessingOverlay label={worker.label || 'Deleting pagesâ€¦'} progress={worker.progress} onCancel={worker.cancel} />}
         </>
       }
     />

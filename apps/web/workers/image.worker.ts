@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Image processing Web Worker.
  * Runs resize / crop / compress / convert / analyze via OffscreenCanvas
  * so heavy pixel work never blocks the main thread.
@@ -34,23 +34,138 @@ import type {
 
 const CHUNK = 0.85
 
+/**
+ * Request ids cancelled from the main thread. Batch loops check this between
+ * items and bail silently; the main thread settles its own promise on cancel.
+ */
+const cancelledIds = new Set<string>()
+
+function isCancelled(id: string) {
+  return cancelledIds.has(id)
+}
+
 function sendProgress(id: string, pct: number, label?: string) {
+  if (isCancelled(id)) return
   const msg: WorkerResponse = { id, type: 'progress', data: { pct, label } }
   postMessage(msg)
 }
 
 function sendResult(id: string, data: unknown) {
+  cancelledIds.delete(id)
   const msg: WorkerResponse = { id, type: 'result', data }
   postMessage(msg)
 }
 
 function sendError(id: string, message: string) {
+  cancelledIds.delete(id)
   const msg: WorkerResponse = { id, type: 'error', data: message }
   postMessage(msg)
 }
 
 function payloadToBlob(p: ImageBlobPayload): Blob {
   return new Blob([base64ToUint8(p.bytes) as unknown as BlobPart], { type: p.mime || 'application/octet-stream' })
+}
+
+/** Circle-cropped image with a transparent interior and a colored ring. */
+async function circleCropWithRing(input: Blob, borderWidth: number, borderColor: string): Promise<Blob> {
+  const bmp = await createImageBitmap(input)
+  const size = Math.min(bmp.width, bmp.height)
+  const canvas = new OffscreenCanvas(size, size)
+  const ctx = canvas.getContext('2d')!
+  ctx.beginPath()
+  ctx.arc(size / 2, size / 2, size / 2 - borderWidth, 0, Math.PI * 2)
+  ctx.closePath()
+  ctx.clip()
+  ctx.drawImage(bmp, (size - bmp.width) / 2, (size - bmp.height) / 2)
+  bmp.close()
+  ctx.restore()
+  if (borderWidth > 0) {
+    ctx.beginPath()
+    ctx.arc(size / 2, size / 2, size / 2 - borderWidth / 2, 0, Math.PI * 2)
+    ctx.strokeStyle = borderColor
+    ctx.lineWidth = borderWidth
+    ctx.stroke()
+  }
+  return canvas.convertToBlob({ type: 'image/png' })
+}
+
+/**
+ * Honest local background removal for solid/uniform backgrounds:
+ * flood-fills inward from the border, erasing pixels whose color is within
+ * `tolerance` of the sampled corner colors. NOT AI matting â€” hair, fur,
+ * gradients and busy backgrounds will not be handled well.
+ */
+async function removeBackground(input: Blob, tolerance: number): Promise<Blob> {
+  const bmp = await createImageBitmap(input)
+  const w = bmp.width
+  const h = bmp.height
+  const canvas = new OffscreenCanvas(w, h)
+  const ctx = canvas.getContext('2d')!
+  ctx.drawImage(bmp, 0, 0)
+  const imgData = ctx.getImageData(0, 0, w, h)
+  const d = imgData.data
+  bmp.close()
+
+  // Reference colors sampled from the four corners.
+  const seeds: number[][] = []
+  for (const idx of [0, (w - 1) * 4, (h - 1) * w * 4, ((h - 1) * w + w - 1) * 4]) {
+    seeds.push([d[idx], d[idx + 1], d[idx + 2]])
+  }
+
+  const tolSq = tolerance * tolerance
+  const matchesBg = (idx4: number): boolean => {
+    const r = d[idx4], g = d[idx4 + 1], b = d[idx4 + 2]
+    for (let s = 0; s < seeds.length; s++) {
+      const dr = r - seeds[s][0]
+      const dg = g - seeds[s][1]
+      const db = b - seeds[s][2]
+      if (dr * dr + dg * dg + db * db <= tolSq) return true
+    }
+    return false
+  }
+
+  // BFS flood fill from matching border pixels.
+  const visited = new Uint8Array(w * h)
+  const queue = new Int32Array(w * h)
+  let qStart = 0
+  let qEnd = 0
+  const push = (p: number) => {
+    if (!visited[p]) {
+      visited[p] = 1
+      queue[qEnd++] = p
+    }
+  }
+  for (let x = 0; x < w; x++) {
+    if (matchesBg(x * 4)) push(x)
+    if (matchesBg(((h - 1) * w + x) * 4)) push((h - 1) * w + x)
+  }
+  for (let y = 0; y < h; y++) {
+    if (matchesBg(y * w * 4)) push(y * w)
+    if (matchesBg((y * w + w - 1) * 4)) push(y * w + w - 1)
+  }
+  while (qStart < qEnd) {
+    const p = queue[qStart++]
+    const x = p % w
+    const y = (p / w) | 0
+    if (x > 0 && !visited[p - 1] && matchesBg((p - 1) * 4)) push(p - 1)
+    if (x < w - 1 && !visited[p + 1] && matchesBg((p + 1) * 4)) push(p + 1)
+    if (y > 0 && !visited[p - w] && matchesBg((p - w) * 4)) push(p - w)
+    if (y < h - 1 && !visited[p + w] && matchesBg((p + w) * 4)) push(p + w)
+  }
+
+  let erased = 0
+  for (let p = 0; p < w * h; p++) {
+    if (visited[p]) {
+      d[p * 4 + 3] = 0
+      erased++
+    }
+  }
+  if (erased > w * h * 0.98) {
+    throw new Error('Tolerance too high â€” nearly the whole image matched the background. Lower it and try again.')
+  }
+
+  ctx.putImageData(imgData, 0, 0)
+  return canvas.convertToBlob({ type: 'image/png' })
 }
 
 async function processOne(
@@ -96,13 +211,17 @@ async function processOne(
 
 async function handle(ev: MessageEvent<WorkerRequest>) {
   const { id, operation, payload, signal } = ev.data
-  if (signal === 'cancel') return
+  if (signal === 'cancel') {
+    if (typeof id === 'string') cancelledIds.add(id)
+    return
+  }
 
   try {
     if (operation === 'info') {
       const p = payload as AnalyzePayload
       const infos = []
       for (let i = 0; i < p.files.length; i++) {
+        if (isCancelled(id)) return
         const info = await getImageInfo(payloadToBlob(p.files[i]))
         infos.push({ ...info, name: p.files[i].name })
         sendProgress(id, ((i + 1) / p.files.length) * 100, `Reading image ${i + 1}/${p.files.length}`)
@@ -115,6 +234,7 @@ async function handle(ev: MessageEvent<WorkerRequest>) {
       const p = payload as AnalyzePayload
       const analyses = []
       for (let i = 0; i < p.files.length; i++) {
+        if (isCancelled(id)) return
         const analysis = await analyzeImage(payloadToBlob(p.files[i]))
         analyses.push({ ...analysis, name: p.files[i].name })
         sendProgress(id, ((i + 1) / p.files.length) * 100, `Analyzing image ${i + 1}/${p.files.length}`)
@@ -127,6 +247,7 @@ async function handle(ev: MessageEvent<WorkerRequest>) {
       const p = payload as CompressAdvancedPayload
       const results = []
       for (let i = 0; i < p.files.length; i++) {
+        if (isCancelled(id)) return
         sendProgress(id, ((i + CHUNK) / p.files.length) * 100, `Compressing ${i + 1}/${p.files.length}`)
         const input = payloadToBlob(p.files[i])
         const res = await compressImageAdvanced(input, {
@@ -154,15 +275,19 @@ async function handle(ev: MessageEvent<WorkerRequest>) {
       return
     }
 
-    if (operation === 'circle-crop') {
+    if (operation === 'circle-crop' || operation === 'circle') {
       const p = payload as CircleCropPayload
       const results = []
       for (let i = 0; i < p.files.length; i++) {
+        if (isCancelled(id)) return
         sendProgress(id, ((i + CHUNK) / p.files.length) * 100, `Processing ${i + 1}/${p.files.length}`)
         const input = payloadToBlob(p.files[i])
         let out: Blob
         if (p.opts.bgColor) {
           out = await circleCropWithBackground(input, p.opts.bgColor, p.opts.borderWidth ?? 0, p.opts.borderColor ?? '#ffffff')
+        } else if ((p.opts.borderWidth ?? 0) > 0) {
+          // Transparent center + colored ring (no background fill requested).
+          out = await circleCropWithRing(input, p.opts.borderWidth ?? 0, p.opts.borderColor ?? '#ffffff')
         } else {
           out = await circleCrop(input)
         }
@@ -183,10 +308,97 @@ async function handle(ev: MessageEvent<WorkerRequest>) {
       return
     }
 
+    if (operation === 'remove-background') {
+      const p = payload as { files: ImageBlobPayload[]; opts?: { tolerance?: number } }
+      const results = []
+      for (let i = 0; i < p.files.length; i++) {
+        if (isCancelled(id)) return
+        sendProgress(id, ((i + CHUNK) / p.files.length) * 100, `Removing background ${i + 1}/${p.files.length}`)
+        const input = payloadToBlob(p.files[i])
+        const out = await removeBackground(input, p.opts?.tolerance ?? 40)
+        const outInfo = await getImageInfo(out)
+        const arr = new Uint8Array(await out.arrayBuffer())
+        const dot = p.files[i].name.lastIndexOf('.')
+        const base = dot === -1 ? p.files[i].name : p.files[i].name.slice(0, dot)
+        results.push({
+          mime: 'image/png',
+          bytes: uint8ToBase64(arr),
+          width: outInfo.width,
+          height: outInfo.height,
+          size: arr.length,
+          name: `${base}-nobg.png`,
+        })
+      }
+      sendResult(id, results)
+      return
+    }
+
+    if (operation === 'add-text') {
+      const p = payload as {
+        files: ImageBlobPayload[]
+        opts: { layers: Array<{
+          text: string; x: number; y: number; fontSize: number
+          fontFamily: string; color: string; bold: boolean; italic: boolean
+          shadow: boolean; opacity: number
+        }> }
+      }
+      const results = []
+      for (let i = 0; i < p.files.length; i++) {
+        if (isCancelled(id)) return
+        sendProgress(id, ((i + CHUNK) / p.files.length) * 100, `Adding text ${i + 1}/${p.files.length}`)
+        const input = payloadToBlob(p.files[i])
+        const bmp = await createImageBitmap(input)
+        const canvas = new OffscreenCanvas(bmp.width, bmp.height)
+        const ctx = canvas.getContext('2d')!
+        ctx.drawImage(bmp, 0, 0)
+        bmp.close()
+        for (const layer of p.opts.layers) {
+          ctx.save()
+          ctx.globalAlpha = Math.max(0, Math.min(1, layer.opacity / 100))
+          let font = ''
+          if (layer.italic) font += 'italic '
+          if (layer.bold) font += 'bold '
+          font += `${layer.fontSize}px "${layer.fontFamily}"`
+          ctx.font = font
+          ctx.fillStyle = layer.color
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          if (layer.shadow) {
+            ctx.shadowColor = 'rgba(0,0,0,0.7)'
+            ctx.shadowBlur = 4
+            ctx.shadowOffsetX = 2
+            ctx.shadowOffsetY = 2
+          }
+          ctx.fillText(layer.text, layer.x, layer.y)
+          ctx.restore()
+        }
+        // Keep JPEG/WebP inputs in their format (much smaller for photos);
+        // everything else becomes PNG.
+        const outType = input.type === 'image/jpeg' || input.type === 'image/webp' ? input.type : 'image/png'
+        const out = await canvas.convertToBlob({ type: outType, quality: 0.92 })
+        const outInfo = await getImageInfo(out)
+        const arr = new Uint8Array(await out.arrayBuffer())
+        const ext = formatToExtension(out.type as ImageFormat)
+        const dot = p.files[i].name.lastIndexOf('.')
+        const base = dot === -1 ? p.files[i].name : p.files[i].name.slice(0, dot)
+        results.push({
+          mime: out.type,
+          bytes: uint8ToBase64(arr),
+          width: outInfo.width,
+          height: outInfo.height,
+          size: arr.length,
+          name: `${base}-text.${ext}`,
+        })
+      }
+      sendResult(id, results)
+      return
+    }
+
     if (operation === 'fill-background') {
       const p = payload as { files: ImageBlobPayload[]; opts: { color: string } }
       const results = []
       for (let i = 0; i < p.files.length; i++) {
+        if (isCancelled(id)) return
         sendProgress(id, ((i + CHUNK) / p.files.length) * 100, `Processing ${i + 1}/${p.files.length}`)
         const input = payloadToBlob(p.files[i])
         const out = await fillBackground(input, p.opts.color)
@@ -212,6 +424,7 @@ async function handle(ev: MessageEvent<WorkerRequest>) {
       const p = payload as { files: ImageBlobPayload[]; opts: { degrees: number } }
       const results = []
       for (let i = 0; i < p.files.length; i++) {
+        if (isCancelled(id)) return
         sendProgress(id, ((i + CHUNK) / p.files.length) * 100, `Rotating ${i + 1}/${p.files.length}`)
         const input = payloadToBlob(p.files[i])
         const out = await rotateImage(input, p.opts.degrees)
@@ -237,6 +450,7 @@ async function handle(ev: MessageEvent<WorkerRequest>) {
       const p = payload as { files: ImageBlobPayload[]; opts: { direction: 'horizontal' | 'vertical' } }
       const results = []
       for (let i = 0; i < p.files.length; i++) {
+        if (isCancelled(id)) return
         sendProgress(id, ((i + CHUNK) / p.files.length) * 100, `Flipping ${i + 1}/${p.files.length}`)
         const input = payloadToBlob(p.files[i])
         const out = await flipImage(input, p.opts.direction)
@@ -262,6 +476,7 @@ async function handle(ev: MessageEvent<WorkerRequest>) {
       const p = payload as { files: ImageBlobPayload[]; opts?: { intensity?: number } }
       const results = []
       for (let i = 0; i < p.files.length; i++) {
+        if (isCancelled(id)) return
         sendProgress(id, ((i + CHUNK) / p.files.length) * 100, `Converting ${i + 1}/${p.files.length}`)
         const input = payloadToBlob(p.files[i])
         const bmp = await createImageBitmap(input)
@@ -293,6 +508,7 @@ async function handle(ev: MessageEvent<WorkerRequest>) {
       const p = payload as { files: ImageBlobPayload[]; opts: { brightness: number; contrast: number; saturation: number } }
       const results = []
       for (let i = 0; i < p.files.length; i++) {
+        if (isCancelled(id)) return
         sendProgress(id, ((i + CHUNK) / p.files.length) * 100, `Adjusting ${i + 1}/${p.files.length}`)
         const input = payloadToBlob(p.files[i])
         const bmp = await createImageBitmap(input)
@@ -337,6 +553,7 @@ async function handle(ev: MessageEvent<WorkerRequest>) {
       const p = payload as { files: ImageBlobPayload[]; opts: { radius: number } }
       const results = []
       for (let i = 0; i < p.files.length; i++) {
+        if (isCancelled(id)) return
         sendProgress(id, ((i + CHUNK) / p.files.length) * 100, `Blurring ${i + 1}/${p.files.length}`)
         const input = payloadToBlob(p.files[i])
         const bmp = await createImageBitmap(input)
@@ -344,7 +561,7 @@ async function handle(ev: MessageEvent<WorkerRequest>) {
         const ctx = canvas.getContext('2d')!
         ctx.filter = `blur(${p.opts.radius}px)`
         ctx.drawImage(bmp, 0, 0)
-        const out = await canvas.convertToBlob({ type: bmp.width > 0 ? 'image/png' : 'image/png' })
+        const out = await canvas.convertToBlob({ type: 'image/png' })
         const arr = new Uint8Array(await out.arrayBuffer())
         const dot = p.files[i].name.lastIndexOf('.')
         const base = dot === -1 ? p.files[i].name : p.files[i].name.slice(0, dot)
@@ -359,6 +576,7 @@ async function handle(ev: MessageEvent<WorkerRequest>) {
       const p = payload as { files: ImageBlobPayload[]; opts: { amount: number } }
       const results = []
       for (let i = 0; i < p.files.length; i++) {
+        if (isCancelled(id)) return
         sendProgress(id, ((i + CHUNK) / p.files.length) * 100, `Sharpening ${i + 1}/${p.files.length}`)
         const input = payloadToBlob(p.files[i])
         const bmp = await createImageBitmap(input)
@@ -402,6 +620,7 @@ async function handle(ev: MessageEvent<WorkerRequest>) {
 
     const results = []
     for (let i = 0; i < files.length; i++) {
+      if (isCancelled(id)) return
       sendProgress(
         id,
         ((i + CHUNK) / files.length) * 100,

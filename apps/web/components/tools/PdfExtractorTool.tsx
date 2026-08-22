@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useCallback, useState } from 'react'
 import { FileUploader } from './FileUploader'
@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { ToolWorkspace, ControlSection } from './ToolWorkspace'
 import { usePdfPages } from '@/hooks/usePdfPages'
 import { usePdfWorker } from '@/hooks/usePdfWorker'
-import { defaultOutputName, resultBlobUrl } from '@/lib/client-utils'
+import { defaultOutputName, resultBlobUrl, releaseResultUrls } from '@/lib/client-utils'
 import { parsePageRanges } from '@pdf-saas/file-utils'
 import { Scissors } from 'lucide-react'
 
@@ -32,7 +32,7 @@ export function PdfExtractorTool() {
   const onFiles = useCallback(async (files: File[]) => {
     const f = files[0]
     setFile(f)
-    setResult(null)
+    setResult(null); releaseResultUrls()
     setRangeInput('')
     await load(f)
   }, [load])
@@ -65,7 +65,7 @@ export function PdfExtractorTool() {
   const reset = useCallback(() => {
     setFile(null)
     setRangeInput('')
-    setResult(null)
+    setResult(null); releaseResultUrls()
   }, [])
 
   if (!file) {
@@ -105,7 +105,7 @@ export function PdfExtractorTool() {
                       <img src={p.dataUrl} alt={`Page ${p.pageNumber}`} className="w-full rounded bg-white shadow-sm" />
                       <div className="mt-1 flex items-center justify-center gap-1">
                         <span className={`text-[10px] font-medium ${isSelected ? 'text-brand-700' : 'text-slate-400'}`}>{p.pageNumber}</span>
-                        {isSelected && <span className="text-[10px] text-brand-600">✓</span>}
+                        {isSelected && <span className="text-[10px] text-brand-600">âœ“</span>}
                       </div>
                     </div>
                   )
@@ -159,7 +159,7 @@ export function PdfExtractorTool() {
             {worker.running && <Button variant="ghost" onClick={worker.cancel}>Cancel</Button>}
           </div>
           <ProgressBar value={worker.progress} label={worker.label} />
-          {worker.running && <ProcessingOverlay label={worker.label || 'Extracting pages…'} progress={worker.progress} onCancel={worker.cancel} />}
+          {worker.running && <ProcessingOverlay label={worker.label || 'Extracting pagesâ€¦'} progress={worker.progress} onCancel={worker.cancel} />}
         </>
       }
     />

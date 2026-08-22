@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { FileUploader } from './FileUploader'
@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { ToolWorkspace, ControlSection } from './ToolWorkspace'
 import { usePdfWorker } from '@/hooks/usePdfWorker'
 import { usePdfPages } from '@/hooks/usePdfPages'
-import { defaultOutputName, resultBlobUrl } from '@/lib/client-utils'
+import { defaultOutputName, resultBlobUrl, releaseResultUrls } from '@/lib/client-utils'
 import { Hash } from 'lucide-react'
 
 type Position = 'bottom-right' | 'bottom-center' | 'top-right' | 'top-center'
@@ -38,7 +38,7 @@ export function PdfPageNumbersTool() {
   const onFiles = useCallback(async (files: File[]) => {
     const f = files[0]
     setFile(f)
-    setResult(null)
+    setResult(null); releaseResultUrls()
     void load(f)
   }, [load])
 
@@ -117,7 +117,7 @@ export function PdfPageNumbersTool() {
     setPosition('bottom-right')
     setFormat('Page {n} of {total}')
     setFontSize(10)
-    setResult(null)
+    setResult(null); releaseResultUrls()
   }, [])
 
   if (!file) {
@@ -197,7 +197,7 @@ export function PdfPageNumbersTool() {
             {worker.running && <Button variant="ghost" onClick={worker.cancel}>Cancel</Button>}
           </div>
           <ProgressBar value={worker.progress} label={worker.label} />
-          {worker.running && <ProcessingOverlay label={worker.label || 'Adding page numbers…'} progress={worker.progress} onCancel={worker.cancel} />}
+          {worker.running && <ProcessingOverlay label={worker.label || 'Adding page numbersâ€¦'} progress={worker.progress} onCancel={worker.cancel} />}
         </>
       }
     />

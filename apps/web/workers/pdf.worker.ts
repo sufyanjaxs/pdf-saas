@@ -38,24 +38,37 @@ import type {
 
 const CHUNK = 0.8
 
+/**
+ * Request ids cancelled from the main thread. PDF operations are single-shot
+ * (no per-item loop), so cancellation here only suppresses late progress and
+ * result messages after the main thread has already settled its promise.
+ */
+const cancelledIds = new Set<string>()
+
 function sendProgress(id: string, pct: number, label?: string) {
+  if (cancelledIds.has(id)) return
   const msg: WorkerResponse = { id, type: 'progress', data: { pct, label } }
   postMessage(msg)
 }
 
 function sendResult(id: string, data: unknown) {
+  cancelledIds.delete(id)
   const msg: WorkerResponse = { id, type: 'result', data }
   postMessage(msg)
 }
 
 function sendError(id: string, message: string) {
+  cancelledIds.delete(id)
   const msg: WorkerResponse = { id, type: 'error', data: message }
   postMessage(msg)
 }
 
 async function handle(ev: MessageEvent<WorkerRequest>) {
   const { id, operation, payload, signal } = ev.data
-  if (signal === 'cancel') return
+  if (signal === 'cancel') {
+    if (typeof id === 'string') cancelledIds.add(id)
+    return
+  }
 
   try {
     switch (operation) {

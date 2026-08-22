@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useCallback, useState } from 'react'
 import { FileUploader } from './FileUploader'
@@ -8,7 +8,8 @@ import { ErrorAlert } from './ErrorAlert'
 import { Button } from '@/components/ui/button'
 import { ToolWorkspace, ControlSection } from './ToolWorkspace'
 import { useImageWorker } from '@/hooks/useImageWorker'
-import { fileToImagePayload, resultBlobUrl } from '@/lib/client-utils'
+import { fileToImagePayload, resultBlobUrl, releaseResultUrls } from '@/lib/client-utils'
+import { BlobImg } from './BlobImg'
 import { Paintbrush } from 'lucide-react'
 
 const ACCEPT = 'image/jpeg,image/png,image/webp'
@@ -27,23 +28,23 @@ export function ImageSharpenTool() {
   const [result, setResult] = useState<ResultItem[] | null>(null)
   const worker = useImageWorker()
 
-  const onFiles = useCallback((f: File[]) => { setFiles(f); setResult(null) }, [])
+  const onFiles = useCallback((f: File[]) => { setFiles(f); setResult(null); releaseResultUrls() }, [])
 
   const currentPreset = PRESETS.find((p) => p.id === presetId)!
   const effectiveAmount = presetId === 'custom' ? amount : currentPreset.amount
 
   const run = useCallback(async () => {
     if (files.length === 0) return
-    setResult(null)
+    setResult(null); releaseResultUrls()
     const payloads = await Promise.all(files.map((f) => fileToImagePayload(f)))
     const res = await worker.run('sharpen', { files: payloads, opts: { amount: effectiveAmount } })
     const items: ResultItem[] = res.map((r: any) => ({
-      name: r.name, url: resultBlobUrl(r.mime, r.bytes), size: r.size, detail: `${r.width}×${r.height}px | amount ${effectiveAmount}%`,
+      name: r.name, url: resultBlobUrl(r.mime, r.bytes), size: r.size, detail: `${r.width}Ã—${r.height}px | amount ${effectiveAmount}%`,
     }))
     setResult(items)
   }, [files, effectiveAmount, worker])
 
-  const reset = useCallback(() => { setFiles([]); setResult(null); setPreset('moderate'); setAmount(50) }, [])
+  const reset = useCallback(() => { setFiles([]); setResult(null); releaseResultUrls(); setPreset('moderate'); setAmount(50) }, [])
 
   if (files.length === 0) {
     return <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"><FileUploader accept={ACCEPT} multiple maxSizeMB={50} minFiles={1} onFiles={onFiles} /></div>
@@ -59,7 +60,7 @@ export function ImageSharpenTool() {
         <div className="flex h-full flex-col items-center justify-center p-4">
           <div className="overflow-hidden rounded-lg">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={URL.createObjectURL(files[0])} alt="Preview"
+            <BlobImg file={files[0]} alt="Preview"
               className="max-h-[50vh] max-w-full rounded bg-white shadow-sm"
               style={{ filter: `contrast(1)`, transition: 'filter 0.2s ease' }} />
           </div>

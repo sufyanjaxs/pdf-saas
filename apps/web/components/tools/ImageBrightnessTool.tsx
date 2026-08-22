@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useCallback, useState } from 'react'
 import { FileUploader } from './FileUploader'
@@ -8,7 +8,8 @@ import { ErrorAlert } from './ErrorAlert'
 import { Button } from '@/components/ui/button'
 import { ToolWorkspace, ControlSection } from './ToolWorkspace'
 import { useImageWorker } from '@/hooks/useImageWorker'
-import { fileToImagePayload, resultBlobUrl } from '@/lib/client-utils'
+import { fileToImagePayload, resultBlobUrl, releaseResultUrls } from '@/lib/client-utils'
+import { BlobImg } from './BlobImg'
 import { Sun, Contrast, Droplets } from 'lucide-react'
 
 const ACCEPT = 'image/jpeg,image/png,image/webp'
@@ -21,20 +22,20 @@ export function ImageBrightnessTool() {
   const [result, setResult] = useState<ResultItem[] | null>(null)
   const worker = useImageWorker()
 
-  const onFiles = useCallback((f: File[]) => { setFiles(f); setResult(null) }, [])
+  const onFiles = useCallback((f: File[]) => { setFiles(f); setResult(null); releaseResultUrls() }, [])
 
   const run = useCallback(async () => {
     if (files.length === 0) return
-    setResult(null)
+    setResult(null); releaseResultUrls()
     const payloads = await Promise.all(files.map((f) => fileToImagePayload(f)))
     const res = await worker.run('brightness', { files: payloads, opts: { brightness, contrast, saturation } })
     const items: ResultItem[] = res.map((r: any) => ({
-      name: r.name, url: resultBlobUrl(r.mime, r.bytes), size: r.size, detail: `${r.width}×${r.height}px`,
+      name: r.name, url: resultBlobUrl(r.mime, r.bytes), size: r.size, detail: `${r.width}Ã—${r.height}px`,
     }))
     setResult(items)
   }, [files, brightness, contrast, saturation, worker])
 
-  const reset = useCallback(() => { setFiles([]); setResult(null); setBrightness(0); setContrast(0); setSaturation(0) }, [])
+  const reset = useCallback(() => { setFiles([]); setResult(null); releaseResultUrls(); setBrightness(0); setContrast(0); setSaturation(0) }, [])
 
   const filterStr = `brightness(${1 + brightness / 100}) contrast(${1 + contrast / 100}) saturate(${1 + saturation / 100})`
 
@@ -52,7 +53,7 @@ export function ImageBrightnessTool() {
         <div className="flex h-full flex-col items-center justify-center p-4">
           <div className="overflow-hidden rounded-lg">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={URL.createObjectURL(files[0])} alt="Preview"
+            <BlobImg file={files[0]} alt="Preview"
               className="max-h-[50vh] max-w-full rounded bg-white shadow-sm"
               style={{ filter: filterStr, transition: 'filter 0.2s ease' }} />
           </div>

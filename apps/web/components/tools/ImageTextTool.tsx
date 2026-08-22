@@ -9,7 +9,7 @@ import { ErrorAlert } from './ErrorAlert'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useImageWorker } from '@/hooks/useImageWorker'
-import { fileToImagePayload, resultBlobUrl } from '@/lib/client-utils'
+import { fileToImagePayload, resultBlobUrl, releaseResultUrls, useBlobUrl } from '@/lib/client-utils'
 import { Type, Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react'
 
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,image/bmp'
@@ -44,18 +44,19 @@ export function ImageTextTool() {
   const [activeLayer, setActiveLayer] = useState<string | null>(null)
   const [result, setResult] = useState<ResultItem[] | null>(null)
   const [imgSize, setImgSize] = useState({ w: 800, h: 600 })
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const worker = useImageWorker()
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const previewFile = files[0] ?? null
+  const previewUrl = useBlobUrl(previewFile)
 
   const onFiles = useCallback(async (incoming: File[]) => {
     const file = incoming[0]; if (!file) return
     setFiles(incoming); setResult(null); setLayers([newLayer()]); setActiveLayer(null)
-    await fileToImagePayload(file)
+    releaseResultUrls()
     const url = URL.createObjectURL(file)
     const img = new Image(); img.src = url
     await new Promise<void>((r) => { img.onload = () => { setImgSize({ w: img.naturalWidth, h: img.naturalHeight }); r() } })
-    setPreviewUrl(url)
+    URL.revokeObjectURL(url)
   }, [])
 
   const active = layers.find((l) => l.id === activeLayer) ?? layers[layers.length - 1]
@@ -98,6 +99,7 @@ export function ImageTextTool() {
 
   const run = useCallback(async () => {
     if (files.length === 0) return; setResult(null)
+    releaseResultUrls()
     const payloads = await Promise.all(files.map((f) => fileToImagePayload(f)))
     const textLayers = layers.map(({ id, ...rest }) => rest)
     const res = await worker.run('add-text', { files: payloads, opts: { layers: textLayers } })
@@ -107,7 +109,7 @@ export function ImageTextTool() {
     setResult(items)
   }, [files, layers, worker])
 
-  const reset = useCallback(() => { setFiles([]); setResult(null); setLayers([newLayer()]); setActiveLayer(null); setPreviewUrl(null) }, [])
+  const reset = useCallback(() => { setFiles([]); setResult(null); setLayers([newLayer()]); setActiveLayer(null); releaseResultUrls() }, [])
 
   return (
     <Card className="relative">

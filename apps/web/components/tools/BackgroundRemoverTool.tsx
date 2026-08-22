@@ -9,7 +9,7 @@ import { ErrorAlert } from './ErrorAlert'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useImageWorker } from '@/hooks/useImageWorker'
-import { fileToImagePayload, resultBlobUrl } from '@/lib/client-utils'
+import { fileToImagePayload, resultBlobUrl, releaseResultUrls, useBlobUrl } from '@/lib/client-utils'
 import { Eraser, Eye, EyeOff, Maximize2, Download } from 'lucide-react'
 
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,image/bmp'
@@ -24,6 +24,7 @@ export function BackgroundRemoverTool() {
   const run = useCallback(async () => {
     if (files.length === 0) return
     setResult(null)
+    releaseResultUrls()
     const payloads = await Promise.all(files.map((f) => fileToImagePayload(f)))
     const res = await worker.run('remove-background', { files: payloads })
     const items: ResultItem[] = res.map((r: any) => ({
@@ -33,7 +34,10 @@ export function BackgroundRemoverTool() {
     setResult(items)
   }, [files, worker])
 
-  const reset = useCallback(() => { setFiles([]); setResult(null); setShowOriginal(false); setPreviewIndex(0) }, [])
+  const reset = useCallback(() => {
+    setFiles([]); setResult(null); setShowOriginal(false); setPreviewIndex(0)
+    releaseResultUrls()
+  }, [])
 
   return (
     <Card className="relative">
@@ -51,14 +55,7 @@ export function BackgroundRemoverTool() {
                 <h3 className="mb-2 text-sm font-semibold text-slate-700">Original Preview</h3>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {files.map((f, i) => (
-                    <button key={i} type="button" onClick={() => setPreviewIndex(i)}
-                      className={`relative overflow-hidden rounded-xl border-2 transition-all ${
-                        previewIndex === i ? 'border-brand-600 shadow-md' : 'border-slate-200 hover:border-brand-300'
-                      }`}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={URL.createObjectURL(f)} alt={f.name} className="aspect-square w-full object-cover" />
-                      <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">{i + 1}</span>
-                    </button>
+                    <ThumbButton key={i} file={f} index={i} active={previewIndex === i} onClick={() => setPreviewIndex(i)} />
                   ))}
                 </div>
               </div>
@@ -121,8 +118,7 @@ export function BackgroundRemoverTool() {
                   <div className="text-center">
                     <p className="mb-1 text-xs font-medium text-slate-500">Original</p>
                     <div className="rounded-xl border border-slate-200 p-1 shadow-sm">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={URL.createObjectURL(files[previewIndex])} alt="Original" className="max-h-[300px] rounded-lg" />
+                      <OriginalPreview file={files[previewIndex]} />
                     </div>
                   </div>
                 )}
@@ -146,15 +142,28 @@ export function BackgroundRemoverTool() {
   )
 }
 
-function CheckerboardPreview({ file }: { file: File }) {
-  const [src, setSrc] = useState<string | null>(null)
+function ThumbButton({ file, index, active, onClick }: { file: File; index: number; active: boolean; onClick: () => void }) {
+  const url = useBlobUrl(file)
+  return (
+    <button type="button" onClick={onClick}
+      className={`relative overflow-hidden rounded-xl border-2 transition-all ${
+        active ? 'border-brand-600 shadow-md' : 'border-slate-200 hover:border-brand-300'
+      }`}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      {url && <img src={url} alt={file.name} className="aspect-square w-full object-cover" />}
+      <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">{index + 1}</span>
+    </button>
+  )
+}
 
-  useState(() => {
-    if (file) {
-      const url = URL.createObjectURL(file)
-      setSrc(url)
-    }
-  })
+function OriginalPreview({ file }: { file: File }) {
+  const url = useBlobUrl(file)
+  // eslint-disable-next-line @next/next/no-img-element
+  return url ? <img src={url} alt="Original" className="max-h-[300px] rounded-lg" /> : null
+}
+
+function CheckerboardPreview({ file }: { file: File }) {
+  const src = useBlobUrl(file)
 
   return (
     <div className="relative max-h-[300px] overflow-hidden rounded-xl border border-slate-200">

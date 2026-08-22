@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useCallback, useState } from 'react'
 import { FileUploader } from './FileUploader'
@@ -9,7 +9,7 @@ import { ErrorAlert } from './ErrorAlert'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useImageWorker } from '@/hooks/useImageWorker'
-import { fileToImagePayload, resultBlobUrl } from '@/lib/client-utils'
+import { fileToImagePayload, resultBlobUrl, releaseResultUrls } from '@/lib/client-utils'
 import { ArrowRight, Check, Shield, Globe, Users, FileText, Mail, Smartphone } from 'lucide-react'
 
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,image/bmp'
@@ -49,7 +49,7 @@ const PURPOSES: PurposeConfig[] = [
     options: [
       { id: 'a4-landscape', name: 'A4 Landscape', desc: '300 DPI landscape', width: 3508, height: 2480 },
       { id: 'a4-portrait', name: 'A4 Portrait', desc: '300 DPI portrait', width: 2480, height: 3508 },
-      { id: 'photo-4x6', name: '4×6 Photo', desc: 'Standard photo print', width: 1800, height: 1200 },
+      { id: 'photo-4x6', name: '4Ã—6 Photo', desc: 'Standard photo print', width: 1800, height: 1200 },
       { id: 'poster-a3', name: 'Poster A3', desc: 'Large format', width: 4961, height: 3508 },
     ], fitOptions: [{ id: 'contain', label: 'Fit' }, { id: 'cover', label: 'Fill (crop to fit)' }],
   },
@@ -93,19 +93,19 @@ export function ResizeForPurposeTool() {
 
   const run = useCallback(async () => {
     if (files.length === 0 || !option) return
-    setResult(null)
+    setResult(null); releaseResultUrls()
     const payloads = await Promise.all(files.map((f) => fileToImagePayload(f)))
     const res = await worker.run('resize', {
       files: payloads, opts: { width: option.width, height: option.height, fit }
     })
     const items: ResultItem[] = res.map((r: any) => ({
       name: r.name, url: resultBlobUrl(r.mime, r.bytes), size: r.size,
-      detail: `${r.width}×${r.height}px | ${purpose.label}: ${option.name}`
+      detail: `${r.width}Ã—${r.height}px | ${purpose.label}: ${option.name}`
     }))
     setResult(items)
   }, [files, option, fit, purpose, worker])
 
-  const reset = useCallback(() => { setFiles([]); setResult(null) }, [])
+  const reset = useCallback(() => { setFiles([]); setResult(null); releaseResultUrls() }, [])
 
   return (
     <Card className="relative">
@@ -142,7 +142,7 @@ export function ResizeForPurposeTool() {
                     }`}>{opt.width < 1000 ? opt.width : `${(opt.width / 1000).toFixed(1)}k`}</span>
                     <div>
                       <span className={`block text-sm font-medium ${selectedOptionId === opt.id ? 'text-brand-700' : 'text-slate-700'}`}>{opt.name}</span>
-                      <span className="block text-xs text-slate-400">{opt.desc} • {opt.width}×{opt.height}</span>
+                      <span className="block text-xs text-slate-400">{opt.desc} â€¢ {opt.width}Ã—{opt.height}</span>
                     </div>
                   </button>
                 ))}
@@ -165,7 +165,7 @@ export function ResizeForPurposeTool() {
               <div className="flex items-center gap-4 rounded-xl bg-slate-50 px-4 py-3">
                 <div className="flex-1">
                   <p className="text-xs text-slate-400">Output</p>
-                  <p className="text-lg font-bold text-slate-800">{option.width} × {option.height} <span className="text-sm font-normal text-slate-400">px</span></p>
+                  <p className="text-lg font-bold text-slate-800">{option.width} Ã— {option.height} <span className="text-sm font-normal text-slate-400">px</span></p>
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-slate-400">{purpose.label}</p>
