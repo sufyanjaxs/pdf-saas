@@ -48,7 +48,9 @@ export function toolMetadata(slug: string, name: string, description: string, ke
     title: `${name} — Free & Online`,
     description,
     keywords: keywords.join(', '),
-    alternates: { canonical: absoluteUrl(`/tools/${slug}/`) },
+    // NOTE: no trailing slash — GitHub Pages serves /tools/<slug> (static
+    // export emits <slug>.html) and the slashed variant returns 404.
+    alternates: { canonical: absoluteUrl(`/tools/${slug}`) },
   })
 }
 
@@ -65,7 +67,7 @@ export function toolJsonLd(slug: string, name: string, description: string): Jso
       '@type': 'WebApplication',
       name: `${name} — Free Online Tool`,
       description,
-      url: absoluteUrl(`/tools/${slug}/`),
+      url: absoluteUrl(`/tools/${slug}`),
       applicationCategory: 'UtilitiesApplication',
       operatingSystem: 'Any (runs in your web browser)',
       browserRequirements: 'Requires JavaScript',
@@ -87,7 +89,7 @@ export function sitemapEntries(): { url: string; changeFrequency: 'weekly'; prio
   return [
     { url: absoluteUrl('/'), changeFrequency: 'weekly', priority: 1 },
     ...toolDefinitions.map((t) => ({
-      url: absoluteUrl(`/tools/${t.slug}/`),
+      url: absoluteUrl(`/tools/${t.slug}`),
       changeFrequency: 'weekly' as const,
       priority: 0.8,
     })),
