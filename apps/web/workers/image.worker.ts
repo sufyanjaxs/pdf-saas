@@ -94,6 +94,10 @@ async function circleCropWithRing(input: Blob, borderWidth: number, borderColor:
  * flood-fills inward from the border, erasing pixels whose color is within
  * `tolerance` of the sampled corner colors. NOT AI matting â€” hair, fur,
  * gradients and busy backgrounds will not be handled well.
+ *
+ * Adaptive: if the requested tolerance erases >98% of the image (flat
+ * one-color input or overshoot), it automatically retries at progressively
+ * lower tolerances before giving up.
  */
 async function removeBackground(input: Blob, tolerance: number): Promise<Blob> {
   const bmp = await createImageBitmap(input)
@@ -102,70 +106,81 @@ async function removeBackground(input: Blob, tolerance: number): Promise<Blob> {
   const canvas = new OffscreenCanvas(w, h)
   const ctx = canvas.getContext('2d')!
   ctx.drawImage(bmp, 0, 0)
-  const imgData = ctx.getImageData(0, 0, w, h)
-  const d = imgData.data
+  const base = ctx.getImageData(0, 0, w, h)
   bmp.close()
 
   // Reference colors sampled from the four corners.
+  const bd = base.data
   const seeds: number[][] = []
   for (const idx of [0, (w - 1) * 4, (h - 1) * w * 4, ((h - 1) * w + w - 1) * 4]) {
-    seeds.push([d[idx], d[idx + 1], d[idx + 2]])
+    seeds.push([bd[idx], bd[idx + 1], bd[idx + 2]])
   }
 
-  const tolSq = tolerance * tolerance
-  const matchesBg = (idx4: number): boolean => {
-    const r = d[idx4], g = d[idx4 + 1], b = d[idx4 + 2]
-    for (let s = 0; s < seeds.length; s++) {
-      const dr = r - seeds[s][0]
-      const dg = g - seeds[s][1]
-      const db = b - seeds[s][2]
-      if (dr * dr + dg * dg + db * db <= tolSq) return true
+  /** Flood-fills a working copy and zeroes alpha of matched pixels. */
+  const floodErase = (data: Uint8ClampedArray, tol: number): number => {
+    const tolSq = tol * tol
+    const matchesBg = (idx4: number): boolean => {
+      const r = data[idx4], g = data[idx4 + 1], b = data[idx4 + 2]
+      for (let s = 0; s < seeds.length; s++) {
+        const dr = r - seeds[s][0]
+        const dg = g - seeds[s][1]
+        const db = b - seeds[s][2]
+        if (dr * dr + dg * dg + db * db <= tolSq) return true
+      }
+      return false
     }
-    return false
-  }
-
-  // BFS flood fill from matching border pixels.
-  const visited = new Uint8Array(w * h)
-  const queue = new Int32Array(w * h)
-  let qStart = 0
-  let qEnd = 0
-  const push = (p: number) => {
-    if (!visited[p]) {
-      visited[p] = 1
-      queue[qEnd++] = p
+    // BFS flood fill from matching border pixels.
+    const visited = new Uint8Array(w * h)
+    const queue = new Int32Array(w * h)
+    let qStart = 0
+    let qEnd = 0
+    const push = (p: number) => {
+      if (!visited[p]) {
+        visited[p] = 1
+        queue[qEnd++] = p
+      }
     }
-  }
-  for (let x = 0; x < w; x++) {
-    if (matchesBg(x * 4)) push(x)
-    if (matchesBg(((h - 1) * w + x) * 4)) push((h - 1) * w + x)
-  }
-  for (let y = 0; y < h; y++) {
-    if (matchesBg(y * w * 4)) push(y * w)
-    if (matchesBg((y * w + w - 1) * 4)) push(y * w + w - 1)
-  }
-  while (qStart < qEnd) {
-    const p = queue[qStart++]
-    const x = p % w
-    const y = (p / w) | 0
-    if (x > 0 && !visited[p - 1] && matchesBg((p - 1) * 4)) push(p - 1)
-    if (x < w - 1 && !visited[p + 1] && matchesBg((p + 1) * 4)) push(p + 1)
-    if (y > 0 && !visited[p - w] && matchesBg((p - w) * 4)) push(p - w)
-    if (y < h - 1 && !visited[p + w] && matchesBg((p + w) * 4)) push(p + w)
-  }
-
-  let erased = 0
-  for (let p = 0; p < w * h; p++) {
-    if (visited[p]) {
-      d[p * 4 + 3] = 0
-      erased++
+    for (let x = 0; x < w; x++) {
+      if (matchesBg(x * 4)) push(x)
+      if (matchesBg(((h - 1) * w + x) * 4)) push((h - 1) * w + x)
     }
-  }
-  if (erased > w * h * 0.98) {
-    throw new Error('Tolerance too high â€” nearly the whole image matched the background. Lower it and try again.')
+    for (let y = 0; y < h; y++) {
+      if (matchesBg(y * w * 4)) push(y * w)
+      if (matchesBg((y * w + w - 1) * 4)) push(y * w + w - 1)
+    }
+    while (qStart < qEnd) {
+      const p = queue[qStart++]
+      const x = p % w
+      const y = (p / w) | 0
+      if (x > 0 && !visited[p - 1] && matchesBg((p - 1) * 4)) push(p - 1)
+      if (x < w - 1 && !visited[p + 1] && matchesBg((p + 1) * 4)) push(p + 1)
+      if (y > 0 && !visited[p - w] && matchesBg((p - w) * 4)) push(p - w)
+      if (y < h - 1 && !visited[p + w] && matchesBg((p + w) * 4)) push(p + w)
+    }
+    let erased = 0
+    for (let p = 0; p < w * h; p++) {
+      if (visited[p]) {
+        data[p * 4 + 3] = 0
+        erased++
+      }
+    }
+    return erased
   }
 
-  ctx.putImageData(imgData, 0, 0)
-  return canvas.convertToBlob({ type: 'image/png' })
+  const MIN_TOLERANCE = 8
+  let tol = Math.max(MIN_TOLERANCE, tolerance)
+  for (;;) {
+    const attempt = new ImageData(new Uint8ClampedArray(base.data), w, h)
+    const erased = floodErase(attempt.data, tol)
+    if (erased <= w * h * 0.98) {
+      ctx.putImageData(attempt, 0, 0)
+      return canvas.convertToBlob({ type: 'image/png' })
+    }
+    if (tol <= MIN_TOLERANCE) {
+      throw new Error('This image is one uniform color â€” there is no distinct background to remove.')
+    }
+    tol = Math.max(MIN_TOLERANCE, Math.floor(tol / 2))
+  }
 }
 
 async function processOne(

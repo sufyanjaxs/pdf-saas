@@ -16,6 +16,9 @@ export function ToolLayout({
     <div className="mx-auto w-full max-w-7xl px-4 py-8">
       <Link
         href="/"
+        // Static export + basePath: prefetching "/" requests "<basePath>.txt",
+        // which 404s on GitHub Pages and logs a console error on every tool page.
+        prefetch={false}
         className="mb-6 inline-flex items-center gap-1.5 text-sm text-slate-500 transition-colors hover:text-brand-600"
       >
         <ArrowLeft className="h-4 w-4" />

@@ -37,11 +37,18 @@ export function PdfExtractorTool() {
     await load(f)
   }, [load])
 
-  const parsed = file ? parsePageRanges(rangeInput.replace('{last}', String(pageCount)).replace(/odd/g, () => {
-    return Array.from({ length: pageCount }, (_, i) => i + 1).filter((p) => p % 2 === 1).join(',')
-  }).replace(/even/g, () => {
-    return Array.from({ length: pageCount }, (_, i) => i + 1).filter((p) => p % 2 === 0).join(',')
-  }), pageCount) : []
+  // Expand quick-range tokens ('{last}', 'odd', 'even') into explicit page
+  // lists. This ONE expanded string drives both the live preview and the
+  // worker payload — sending the raw tokens would crash engine parsing.
+  const expandedRange = file
+    ? rangeInput
+        .replace('{last}', String(pageCount))
+        .replace(/odd/g, () =>
+          Array.from({ length: pageCount }, (_, i) => i + 1).filter((p) => p % 2 === 1).join(','))
+        .replace(/even/g, () =>
+          Array.from({ length: pageCount }, (_, i) => i + 1).filter((p) => p % 2 === 0).join(','))
+    : ''
+  const parsed = file ? parsePageRanges(expandedRange, pageCount) : []
   const validRange = parsed.length > 0 && parsed.length <= pageCount
 
   const run = useCallback(async () => {
@@ -49,7 +56,7 @@ export function PdfExtractorTool() {
     const bytes = await file.arrayBuffer()
     const res = await worker.run('extract', {
       bytes: new Uint8Array(bytes),
-      ranges: rangeInput,
+      ranges: expandedRange,
     })
     const name = defaultOutputName(file.name, 'extracted', 'application/pdf')
     setResult([
@@ -60,7 +67,7 @@ export function PdfExtractorTool() {
         detail: `${parsed.length} page${parsed.length === 1 ? '' : 's'}`,
       },
     ])
-  }, [file, rangeInput, parsed.length, validRange, worker])
+  }, [file, expandedRange, parsed.length, validRange, worker])
 
   const reset = useCallback(() => {
     setFile(null)

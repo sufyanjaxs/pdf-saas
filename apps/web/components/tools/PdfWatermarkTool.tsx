@@ -90,6 +90,14 @@ export function PdfWatermarkTool() {
     setResult(null); releaseResultUrls()
   }, [])
 
+  if (!file) {
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <FileUploader accept="application/pdf" maxSizeMB={200} hint="Drop a PDF file, or browse" onFiles={onFiles} />
+      </div>
+    )
+  }
+
   return (
     <ToolWorkspace
       preview={

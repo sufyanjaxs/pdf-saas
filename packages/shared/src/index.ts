@@ -68,7 +68,10 @@ export interface RotatePayload {
   bytes: Uint8Array;
   /** 1-based page numbers, or empty = all pages */
   pages: number[];
+  /** uniform clockwise delta when using the simple path */
   degrees: 90 | 180 | 270;
+  /** per-page absolute angles (1-based page -> 0|90|180|270); takes precedence */
+  rotations?: Record<string | number, number>;
 }
 
 export interface MergePayload {

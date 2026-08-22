@@ -112,7 +112,13 @@ export function validateFiles(
 ): FileValidationResult {
   const errors: FileValidationError[] = [];
   const allowedMimes = (opts.accept ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
-  const allowedExts = (opts.extensions ?? []).map((e) => e.toLowerCase().replace(/^\./, ''));
+  // `accept` may contain extension-style entries (".docx") alongside MIME
+  // types — FileUploader passes its HTML accept attribute straight through.
+  const allowedExtsFromAccept = allowedMimes.filter((s) => s.startsWith('.'));
+  const allowedExts = [
+    ...(opts.extensions ?? []).map((e) => e.toLowerCase().replace(/^\./, '')),
+    ...allowedExtsFromAccept.map((e) => e.replace(/^\./, '')),
+  ];
 
   if (opts.minCount && files.length < opts.minCount) {
     return {
@@ -130,11 +136,14 @@ export function validateFiles(
   files.forEach((file, i) => {
     const ext = extensionOf(file.name);
     const mime = file.type.toLowerCase();
-    const typeOk =
+    const mimeOk =
       allowedMimes.length === 0 ||
       allowedMimes.includes('*') ||
       allowedMimes.includes(mime) ||
       (allowedMimes.includes('application/pdf') && mime === 'application/octet-stream' && ext === 'pdf');
+    // Extension-style accept entries decide by extension alone (browsers send
+    // inconsistent MIME types for docx etc.), so they bypass the MIME gate.
+    const typeOk = mimeOk || allowedExtsFromAccept.includes('.' + ext);
     const extOk = allowedExts.length === 0 || allowedExts.includes(ext);
     if (!typeOk || !extOk) {
       errors.push({

@@ -134,10 +134,22 @@ export async function extractPages(input: { bytes: Uint8Array; ranges: string })
   return out.save({ useObjectStreams: true });
 }
 
-export async function rotatePdf(input: RotateInput): Promise<Uint8Array> {
+export async function rotatePdf(input: RotateInput & { rotations?: Record<string | number, number> }): Promise<Uint8Array> {
   const doc = await PDFDocument.load(input.bytes, { ignoreEncryption: false });
   if (doc.isEncrypted) throw new Error('Encrypted PDFs are not supported.');
   const total = doc.getPageCount();
+  if (input.rotations && Object.keys(input.rotations).length > 0) {
+    // Per-page absolute angles (0/90/180/270) as sent by the visual editor.
+    for (const [key, angle] of Object.entries(input.rotations)) {
+      const p = Number(key);
+      if (!Number.isInteger(p) || p < 1 || p > total) continue;
+      const page = doc.getPage(p - 1);
+      if (typeof angle === 'number' && Number.isFinite(angle)) {
+        page.setRotation(degrees(((angle % 360) + 360) % 360));
+      }
+    }
+    return doc.save({ useObjectStreams: true });
+  }
   const targets = input.pages.length === 0 ? Array.from({ length: total }, (_, i) => i + 1) : padPageIndex(input.pages, total);
   targets.forEach((p) => {
     const page = doc.getPage(p - 1);
